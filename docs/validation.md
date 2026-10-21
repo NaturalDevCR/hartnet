@@ -33,7 +33,14 @@ migration is described separately in [party-migration.md](party-migration.md).
 The live HA OS app and HACS component were updated to 0.2.0. Ingress serves the language
 module, macro-light compatibility profiles are registered, and the prepared resting buffer
 matches the previous sender across all 512 slots. HA configuration validation passed;
-HartNet output remains stopped pending the confirmed Core restart and label cutover.
+After an explicitly confirmed Core restart, the previous YAML sender was no longer loaded.
+HartNet output was enabled and the party-effects/managed labels moved to the two spots and
+two macro lights. All four were available; speed values remained 255. The seven-target
+coordinator dry run reported no unavailable entities once startup settled. Read-only policy
+checks resolved all four effects to off with Party inactive and on with simulated Party active.
+Native HA off/value services succeeded while preserving the complete resting buffer. Music,
+timers, button logic and central scripts were preserved. Physical party playback remains a
+separate user test; UDP transmission does not confirm fixture behavior.
 
 ## Existing-installation test sequence
 

@@ -31,7 +31,7 @@ class HartNetCoordinator(DataUpdateCoordinator):
         try:
             return await self.client.request("state")
         except (ClientError, TimeoutError, ValueError) as err:
-            raise UpdateFailed("No se pudo conectar con la app HartNet") from err
+            raise UpdateFailed("Could not connect to the HartNet app") from err
 
     async def command(self, fixture_id, command):
         from homeassistant.exceptions import HomeAssistantError
