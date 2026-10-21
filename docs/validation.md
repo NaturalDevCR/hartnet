@@ -56,6 +56,19 @@ separate user test; UDP transmission does not confirm fixture behavior.
 A complete universe contains every slot. Testing one fixture does not isolate other controls
 in that universe. Use separate destinations/universes or explicitly maintain one buffer owner.
 
+## Restart recovery (0.3)
+
+The local engine/API/protocol suite passes 49 tests; the separate real-HA suite passes 3 tests.
+Automated regressions cover active and stopped restarts, all generic control types, light/color
+and interrupted fade targets, concurrent commands, failed atomic replacement, strict corrupt-state
+rejection and legacy file migration. A real subprocess test sends commands over HTTP, kills the
+process with SIGKILL, restarts it and checks the first UDP packet against the acknowledged values.
+
+Socket binding failures retry and can be stopped during backoff. A failed destination does not stop
+healthy universes. Unexpected sender task failures produce a failing health probe without exposing
+project data. Runtime state and output intent are persisted together with the project; no cleanup
+handler is needed for crash recovery.
+
 ## Before a stable release
 
 - More amd64/aarch64 Supervisor and HACS validation, physical fixtures and channel tables.

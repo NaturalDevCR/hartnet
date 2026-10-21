@@ -21,13 +21,13 @@ async def test_api_auth_preview_commit_persistence(aiohttp_client, tmp_path, leg
     preview = await response.json()
     assert response.status == 200 and len(preview["project"]["fixtures"]) == 8
     assert app[ENGINE].transport is None
-    assert json.loads(path.read_text())["fixtures"] == []  # Preview is side-effect free.
+    assert json.loads(path.read_text())["project"]["fixtures"] == []  # Preview is side-effect free.
     response = await client.put("/api/project", headers=HEADERS, json=preview["project"])
     saved = await response.json()
     assert response.status == 200
     assert not saved["output_enabled"] and app[ENGINE].transport is None
     assert saved["project"]["id"] == info["id"]
-    assert len(json.loads(path.read_text())["fixtures"]) == 8
+    assert len(json.loads(path.read_text())["project"]["fixtures"]) == 8
     exported = await (await client.get("/api/profiles", headers=HEADERS)).json()
     assert "192.0.2.30" not in json.dumps(exported)
     assert path.with_suffix(".previous.json").exists()

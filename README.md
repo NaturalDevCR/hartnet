@@ -2,7 +2,7 @@
 
 **Art-Net profiles, a visual workspace, and native Home Assistant entities.**
 
-Status: **experimental alpha 0.2.0**. The engine, app and HA integration are implemented.
+Status: **experimental alpha 0.3.0**. The engine, app and HA integration are implemented.
 Physical gateway and fixture validation is ongoing. This is a subset of Art-Net functionality.
 
 ![HartNet workspace with a sample patch](docs/images/hartnet.png)
@@ -23,9 +23,13 @@ Function semantics come from each fixture's manual.
 - Unicast output, per-node FPS limits, refresh and transitions for continuous values.
 - Explicit ArtPoll / ArtPollReply discovery, including BindIndex.
 - Address, overlap, range and option validation; authenticated API and atomic project backups.
+- Durable light/number/select/switch values and output intent, restored before the first DMX frame.
+- Bounded network retries and a Supervisor health endpoint for process recovery.
 
-Output starts **stopped on every app startup**. The patch is saved; runtime values are volatile.
-HA entities are unavailable while output is stopped. No MQTT broker is required.
+**Values and output intent survive app restarts and process crashes.** Each accepted command is
+saved atomically before its HTTP response. An active output resumes with its saved values;
+a manual stop remains stopped. A fresh installation starts stopped. HA entities are unavailable
+while output is stopped. No MQTT broker is required.
 Changing the interface language never translates user-provided names or alters a patch.
 
 ## Install on Home Assistant OS
@@ -57,6 +61,21 @@ other transports and destination overrides are rejected explicitly. Per-command 
 legacy per-fixture default transitions are not imported yet. High-resolution color uses the whole
 range, while the legacy component scales 8-bit steps. Constants preserve legacy scaling.
 Existing entity IDs are neither adopted nor renamed; automation migration is a separate step.
+
+## Restart recovery
+
+Brightness, color, macro/speed values, switches and selections are saved with the project in one
+versioned transaction. Fade targets are saved once per command; individual frames do not write
+to storage. After an interrupted transition, the final requested value is restored immediately.
+
+Enable **Start on boot** and **Watchdog** in the app settings for host reboot/process recovery.
+The [Supervisor watchdog](https://contributors.home-assistant.io/apps/reference/configuration/#url-templates)
+checks `/health`; the endpoint exposes no project details. Transient socket/destination errors
+retry with bounded backoff without blocking the HTTP API or healthy destinations.
+
+Version 0.2 saved no runtime values. The first upgrade to 0.3 therefore starts stopped; restore the
+intended presets and enable output once. Subsequent restarts recover automatically. Invalid or
+unsupported stored state fails closed instead of transmitting invented defaults. Keep backups.
 
 ## Profiles and devices
 

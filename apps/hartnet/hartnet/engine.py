@@ -2,10 +2,11 @@
 
 import asyncio
 import contextlib
+import logging
 import time
 from copy import deepcopy
 
-from .model import CURVES, ValidationError, integer, require, validate_project
+from .model import CURVES, integer, require, validate_project
 from .protocol import PORT, art_dmx, art_poll, parse_poll_reply
 
 LIGHT_KINDS = {"dimmer", "red", "green", "blue", "white", "cold_white", "warm_white"}
@@ -24,14 +25,17 @@ class Receiver(asyncio.DatagramProtocol):
 
     def error_received(self, exc):
         self.engine.last_error = str(exc)
+        self.engine.socket_error = exc
 
 
 class Engine:
     def __init__(self, project, bind_host="0.0.0.0", bind_port=PORT):
         self.bind_host, self.bind_port = bind_host, bind_port
         self.transport = self.task = None
+        self.output_requested = False
         self.discovered = {}
         self.last_error = None
+        self.socket_error = None
         self.frames_sent = 0
         self.load(project)
 
@@ -57,6 +61,61 @@ class Engine:
         self._last_frames = {}
         self._last_sent = {}
 
+    def restore_runtime(self, runtime):
+        require(
+            isinstance(runtime, dict) and set(runtime) == {"states", "output_enabled"},
+            "Invalid saved runtime",
+        )
+        require(type(runtime["output_enabled"]) is bool, "Invalid saved output intent")
+        states = runtime["states"]
+        require(
+            isinstance(states, dict) and set(states) == set(self.fixtures),
+            "Saved state does not match the project",
+        )
+        validated = {}
+        for fixture_id, state in states.items():
+            require(
+                isinstance(state, dict) and set(state) == {"on", "brightness", "color", "values"},
+                "Invalid saved fixture state",
+            )
+            values = state["values"]
+            controls = self.controls(self.fixtures[fixture_id])
+            require(
+                isinstance(values, dict) and set(values) == {c["id"] for c in controls},
+                "Invalid saved control values",
+            )
+            editable = {c["id"] for c in controls if c["kind"] in {"number", "switch", "select"}}
+            for control in controls:
+                if control["id"] not in editable:
+                    require(
+                        type(values[control["id"]]) is int
+                        and values[control["id"]] == control.get("default", 0),
+                        "Saved fixed value does not match the profile",
+                    )
+            command = {**state, "values": {k: v for k, v in values.items() if k in editable}}
+            validated[fixture_id], _ = self.prepare_command(fixture_id, command)
+        require(not runtime["output_enabled"] or self.fixtures, "Saved output requires fixtures")
+        self.states = validated
+        self.output_requested = runtime["output_enabled"]
+
+    def carry_states_from(self, previous):
+        # Names, units and device metadata do not change the stored DMX meaning.
+        def signature(profile):
+            return {
+                c["id"]: {k: v for k, v in c.items() if k not in {"name", "unit"}}
+                for c in profile["controls"]
+            }
+
+        for fixture_id, fixture in self.fixtures.items():
+            old = previous.fixtures.get(fixture_id)
+            if old and all(
+                fixture[k] == old[k] for k in ("node_id", "profile_id", "universe", "start_channel")
+            ):
+                if signature(self.profiles[fixture["profile_id"]]) == signature(
+                    previous.profiles[old["profile_id"]]
+                ):
+                    self.states[fixture_id] = deepcopy(previous.states[fixture_id])
+
     def controls(self, fixture):
         return self.profiles[fixture["profile_id"]]["controls"]
 
@@ -66,7 +125,7 @@ class Engine:
             (c for c in controls if c["kind"] in COLOR_KINDS), key=lambda c: COLOR_KINDS.index(c["kind"])
         )
 
-    def command(self, fixture_id, command):
+    def prepare_command(self, fixture_id, command):
         require(fixture_id in self.fixtures, "Fixture does not exist")
         require(
             isinstance(command, dict)
@@ -111,12 +170,20 @@ class Engine:
             state["values"][key] = value
         transition = command.get("transition", 0)
         require(type(transition) in (int, float) and 0 <= transition <= 999, "transition: 0–999 seconds")
+        return state, transition
+
+    def apply_command(self, fixture_id, state, transition):
+        fixture = self.fixtures[fixture_id]
         now = time.monotonic()
         previous = self.render_fixture(fixture, now)
         self.states[fixture_id] = state
         self.fades.pop(fixture_id, None)
         if transition:
             self.fades[fixture_id] = (now, transition, previous, self.render_fixture(fixture, now))
+
+    def command(self, fixture_id, command):
+        state, transition = self.prepare_command(fixture_id, command)
+        self.apply_command(fixture_id, state, transition)
 
     def render_fixture(self, fixture, now=None):
         now = time.monotonic() if now is None else now
@@ -181,18 +248,27 @@ class Engine:
     async def start(self):
         if self.enabled:
             return
-        require(self.project["fixtures"], "Agrega fixtures antes de activar la salida")
-        await self.open_socket()
+        require(self.project["fixtures"], "Add fixtures before enabling output")
+        self.output_requested = True
         self.last_error = None
         self._last_sent.clear()
+        self._last_frames.clear()
         self.task = asyncio.create_task(self._run())
+        self.task.add_done_callback(self._output_done)
+
+    def _output_done(self, task):
+        if not task.cancelled() and (error := task.exception()) is not None:
+            self.last_error = str(error)
+            logging.getLogger(__name__).error("Art-Net sender failed", exc_info=error)
 
     async def stop(self):
+        self.output_requested = False
         if self.task:
             self.task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self.task
             self.task = None
+        self.last_error = None
 
     async def close(self):
         await self.stop()
@@ -210,10 +286,18 @@ class Engine:
     async def _run(self):
         nodes = {n["id"]: n for n in self.project["nodes"]}
         sequences = {}
-        try:
-            while True:
+        retry_delay = 0.5
+        retries, failures = {}, {}
+        while True:
+            try:
+                if self.socket_error is not None:
+                    error, self.socket_error = self.socket_error, None
+                    raise OSError(str(error))
+                await self.open_socket()
                 now = time.monotonic()
                 for key, frame in self.frames().items():
+                    if now < retries.get(key, (0, 0.5))[0]:
+                        continue
                     node = nodes[key[0]]
                     elapsed = now - self._last_sent.get(key, float("-inf"))
                     refresh = node.get("refresh_every", 1)
@@ -222,21 +306,50 @@ class Engine:
                     if frame == self._last_frames.get(key) and not (refresh and elapsed >= refresh):
                         continue
                     sequence = sequences.get(key, 0) % 255 + 1
-                    self.transport.sendto(
-                        art_dmx(key[1], frame, sequence), (node["host"], node.get("port", PORT))
-                    )
+                    try:
+                        self.transport.sendto(
+                            art_dmx(key[1], frame, sequence), (node["host"], node.get("port", PORT))
+                        )
+                    except OSError as err:
+                        delay = retries.get(key, (0, 0.5))[1]
+                        retries[key] = now + delay, min(delay * 2, 10)
+                        failures[key] = str(err)
+                        continue
+                    retries.pop(key, None)
+                    failures.pop(key, None)
                     sequences[key] = sequence
                     self._last_sent[key], self._last_frames[key] = now, frame
                     self.frames_sent += 1
+                self.last_error = next(iter(failures.values()), None)
+                retry_delay = 0.5
                 await asyncio.sleep(1 / 100)
-        except (OSError, ValidationError) as err:
-            self.last_error = str(err)
+            except OSError as err:
+                self.last_error = str(err)
+                if self.transport:
+                    self.transport.close()
+                    self.transport = None
+                self._last_sent.clear()
+                self._last_frames.clear()
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 10)
+
+    @property
+    def output_status(self):
+        if not self.output_requested:
+            return "stopped"
+        if not self.enabled:
+            return "error"
+        if self.last_error:
+            return "retrying"
+        return "active" if self.transport else "starting"
 
     def snapshot(self):
         return {
             "project": deepcopy(self.project),
             "states": deepcopy(self.states),
             "output_enabled": self.enabled,
+            "output_requested": self.output_requested,
+            "output_status": self.output_status,
             "frames_sent": self.frames_sent,
             "last_error": self.last_error,
             "discovered": list(self.discovered.values()),

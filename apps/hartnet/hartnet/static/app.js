@@ -1,7 +1,7 @@
 import { t, localizeShell, setLanguage, language, localizeMessage } from "./i18n.js";
 const $ = (selector) => document.querySelector(selector);
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let state, selected, tab = "fixtures", preview, editorSave;
+let state, selected, tab = "fixtures", preview, editorSave, outputError, connectionFailed=false;
 const kinds = ["dimmer","red","green","blue","white","cold_white","warm_white","number","switch","select","constant"];
 const titles = () => ({fixtures:[t("Fixtures"),t("A workspace to connect, map and control.")],patch:[t("Universe patch"),t("Every function's address, with the whole picture in view.")],profiles:[t("Profile library"),t("Create once. Reuse, adapt and share.")],import:[t("Bring your configuration"),t("From YAML to a visual workspace. Keep every address.")],settings:[t("Settings"),t("Connections, discovery and project tools.")]});
 const option = (value,label,chosen) => `<option value="${escape(value)}" ${value === chosen ? "selected" : ""}>${escape(label)}</option>`;
@@ -23,17 +23,28 @@ async function api(path,method="GET",body) {
   return result;
 }
 async function guarded(action) {try {await action();} catch(error) {notify(error.message,true);}}
-async function refresh(renderContent=true) {state=await api("state"); renderHeader(); if(renderContent) render();}
+async function refresh(renderContent=true) {
+  const previous=state;
+  try {state=await api("state");} catch(error) {connectionFailed=true; throw error;}
+  if(connectionFailed) {connectionFailed=false; notify(t("Connection restored."));}
+  renderHeader();
+  const editing=$("#editor").open || document.activeElement?.matches("#content input, #content textarea, #content select");
+  if(editing) return;
+  if(renderContent || JSON.stringify(previous?.project)!==JSON.stringify(state.project)) render();
+  else if(tab==="fixtures" && selected && JSON.stringify(previous?.states[selected])!==JSON.stringify(state.states[selected])) renderInspector();
+}
 function renderHeader() {
   $("#stat-nodes").textContent=state.project.nodes.length;
   $("#stat-fixtures").textContent=state.project.fixtures.length;
   $("#nav-count").textContent=state.project.fixtures.length;
   $("#stat-universes").textContent=new Set(state.project.fixtures.map(f=>`${f.node_id}:${f.universe}`)).size;
   $("#stat-frames").textContent=state.frames_sent.toLocaleString();
-  $("#output-badge").textContent=state.output_enabled ? t("Output active · Assumed state") : t("Output stopped");
-  $("#output-badge").classList.toggle("live",state.output_enabled);
-  $("#output-toggle").textContent=state.output_enabled ? t("Stop output") : t("Enable output");
-  if(state.last_error) notify(state.last_error,true);
+  const outputStatus=state.output_status || (state.output_enabled ? "active" : "stopped");
+  $("#output-badge").textContent=t(({active:"Output active · Assumed state", stopped:"Output stopped", starting:"Starting output", retrying:"Reconnecting output", error:"Output failed"})[outputStatus]);
+  $("#output-badge").classList.toggle("live",outputStatus==="active");
+  $("#output-toggle").textContent=(state.output_requested ?? state.output_enabled) ? t("Stop output") : t("Enable output");
+  if(state.last_error) {outputError=state.last_error; notify(outputError,true);}
+  else if(outputError) {if($("#message").textContent===localizeMessage(outputError)) $("#message").hidden=true; outputError=null;}
 }
 function render() {
   $("#page-title").textContent=titles()[tab][0]; $("#page-description").textContent=titles()[tab][1];
@@ -71,7 +82,7 @@ async function previewImport() {
   $("#import-preview").innerHTML=`<div class="preview"><h3>${preview.project.fixtures.length} ${t("fixtures ready for review")}</h3><div class="table-scroll"><table class="preview-table"><thead><tr><th>${t("Fixture")}</th><th>${t("Universe")}</th><th>${t("Start")}</th><th>${t("Entities")}</th></tr></thead><tbody>${preview.project.fixtures.map(f=>{const p=preview.project.profiles.find(p=>p.id===f.profile_id),scalar=p.controls.every(c=>["number","constant"].includes(c.kind));return `<tr><td>${escape(f.name)}</td><td>${f.universe}</td><td>${f.start_channel}</td><td>${scalar ? "number" : "light"}</td></tr>`;}).join("")}</tbody></table></div><ul>${preview.warnings.map(w=>`<li>${escape(localizeMessage(w))}</li>`).join("")}</ul><button class="primary" data-action="apply-import">${t("Replace patch with this import")}</button></div>`;
 }
 function renderSettings() {
-  $("#content").innerHTML=`<div class="settings-panel panel"><div class="toolbar"><h2>${t("Nodes and connections")}</h2><button data-action="add-node">${t("＋ Add node")}</button></div>${state.project.nodes.map(n=>`<div class="node-strip"><div>${escape(n.name)}<small>${escape(n.host)}:${n.port??6454} · ${n.full_universe ? t("512 channels") : t("Partial frames")}</small></div><button data-edit-node="${escape(n.id)}">${t("Edit")}</button></div>`).join("")}</div><div class="settings-panel panel"><h2>${t("Art-Net discovery")}</h2><p>${t("ArtPoll discovers nodes and universes. It cannot automatically identify DMX fixture functions. Enter a node IP or your network's directed broadcast address.")}</p><div class="form-grid"><label>${t("IPv4 target")}<input id="discovery-target" placeholder="192.0.2.30"></label><div class="actions"><button data-action="discover">${t("Find nodes")}</button></div></div><div id="discovery-results"></div></div><div class="settings-panel panel"><h2>${t("Advanced project editor")}</h2><p>${t("Includes installation addresses. Changes require stopped output and are checked for overlaps. The previous configuration is backed up. New entities appear automatically in HA; reload the integration after removing or changing types.")}</p><label for="project-json">${t("Project JSON")}</label><textarea id="project-json" spellcheck="false">${escape(JSON.stringify(state.project,null,2))}</textarea><div class="actions"><button class="primary" data-action="save-json">${t("Validate and save project")}</button><button data-action="download-project">${t("Download project backup")}</button></div></div>`;
+  $("#content").innerHTML=`<div class="settings-panel panel"><h2>${t("Restart recovery")}</h2><p>${t("Values are saved before each change is confirmed. App restarts restore the last accepted values and resume output only if it was enabled. A manual stop stays stopped. Interrupted transitions resume at their target values.")}</p></div><div class="settings-panel panel"><div class="toolbar"><h2>${t("Nodes and connections")}</h2><button data-action="add-node">${t("＋ Add node")}</button></div>${state.project.nodes.map(n=>`<div class="node-strip"><div>${escape(n.name)}<small>${escape(n.host)}:${n.port??6454} · ${n.full_universe ? t("512 channels") : t("Partial frames")}</small></div><button data-edit-node="${escape(n.id)}">${t("Edit")}</button></div>`).join("")}</div><div class="settings-panel panel"><h2>${t("Art-Net discovery")}</h2><p>${t("ArtPoll discovers nodes and universes. It cannot automatically identify DMX fixture functions. Enter a node IP or your network's directed broadcast address.")}</p><div class="form-grid"><label>${t("IPv4 target")}<input id="discovery-target" placeholder="192.0.2.30"></label><div class="actions"><button data-action="discover">${t("Find nodes")}</button></div></div><div id="discovery-results"></div></div><div class="settings-panel panel"><h2>${t("Advanced project editor")}</h2><p>${t("Includes installation addresses. Changes require stopped output and are checked for overlaps. The previous configuration is backed up. New entities appear automatically in HA; reload the integration after removing or changing types.")}</p><label for="project-json">${t("Project JSON")}</label><textarea id="project-json" spellcheck="false">${escape(JSON.stringify(state.project,null,2))}</textarea><div class="actions"><button class="primary" data-action="save-json">${t("Validate and save project")}</button><button data-action="download-project">${t("Download project backup")}</button></div></div>`;
 }
 function showEditor(title,markup,save) {$("#editor-title").textContent=title;$("#editor-body").innerHTML=markup;$("#editor-error").textContent="";editorSave=save;$("#editor").showModal();}
 async function saveProject(project) {state=await api("project","PUT",project);renderHeader();render();notify(t("Configuration validated and saved. Output stopped."));}
@@ -98,7 +109,7 @@ function readChannels() {
 function download(data,filename) {const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function command(body) {state=await api(`fixtures/${encodeURIComponent(selected)}/command`,"POST",body);renderHeader();renderInspector();}
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;render();}));
-$("#output-toggle").addEventListener("click",()=>guarded(async()=>{state=await api("output","POST",{enabled:!state.output_enabled});renderHeader();render();notify(state.output_enabled ? t("DMX output enabled for the configured nodes.") : t("Packets stopped. The node may hold its last state."));}));
+$("#output-toggle").addEventListener("click",()=>guarded(async()=>{state=await api("output","POST",{enabled:!(state.output_requested ?? state.output_enabled)});renderHeader();render();notify(state.output_enabled ? t("Output enabled. Values and output will be restored after app restarts.") : t("Output stopped and kept stopped after app restarts. The node may hold its last state."));}));
 $("#close-editor").addEventListener("click",()=>$("#editor").close());
 $("#editor-form").addEventListener("submit",async event=>{event.preventDefault();try{await editorSave(event.currentTarget);$("#editor").close();}catch(error){$("#editor-error").textContent=localizeMessage(error.message);}});
 $("#editor-body").addEventListener("click",event=>{const button=event.target.closest("[data-remove-channel]");if(button) button.closest("[data-channel-row]").remove();});

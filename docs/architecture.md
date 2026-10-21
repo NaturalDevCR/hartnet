@@ -55,9 +55,21 @@ One UDP socket uses local port 6454, with bounded transmission frequency. Explic
 shares the socket and identifies replies by IP and BindIndex, recording last observation.
 Periodic expiry and Art-Net 4 subscription maintenance are not implemented.
 
-Project edits require stopped output. Validation precedes a temporary-file write, fsync and atomic
-replacement; the previous project is retained. Installation identity survives importing another
-patch. Runtime values are volatile and output requires explicit activation after every app startup.
+Project edits require stopped output. A single versioned envelope stores the validated project,
+all accepted fixture targets and output intent. Temporary-file write, file fsync, atomic replacement
+and directory fsync precede acknowledgement and publication to the sender. Disk IO runs outside
+the event loop; the API serializes mutations. Per-frame fades do not write to storage.
+
+Startup validates the whole document before restoring any state or creating a sender task. Legacy
+project-only files migrate without inventing runtime values. Invalid/unsupported state fails closed.
+Normal shutdown stops sockets without persisting a user stop; only the explicit output API changes
+that intent. Restart restores the target of an interrupted fade before the first frame. A manual stop
+survives restart. Unchanged fixture mappings retain presets during unrelated project edits.
+
+Network failures retry with bounded exponential backoff. Synchronous destination failures do not
+block healthy destinations. Unexpected task failures make `/health` return 503 so the Supervisor
+watchdog can restart the process. Expected network recovery keeps HTTP/API available. UDP still
+does not acknowledge physical state.
 
 ## Languages and exports
 

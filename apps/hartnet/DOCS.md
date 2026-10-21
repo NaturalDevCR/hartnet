@@ -10,9 +10,19 @@
 6. Use host `127.0.0.1`, port `8099` and the same token. The app uses host networking.
 7. Stop the previous sender and review every slot before enabling output.
 
-The app saves `/data/project.json` and the preceding version as `/data/project.previous.json`.
-Every app startup preserves the patch and starts with output stopped. Runtime values are not
-restored. Stopping output stops packets; the gateway may hold its last state. Turn lights off
+The app saves a versioned project/runtime envelope in `/data/project.json`. This internal file
+contains both the mapping and accepted values/output intent; use the UI export for portable
+project JSON. `/data/project.previous.json` preserves the state preceding a project edit.
+Commands update the current state atomically without rotating that project-edit backup.
+
+App restarts restore accepted brightness, color, numbers, switches and selections before sending
+any DMX. Output resumes if it was enabled, and stays stopped if manually stopped. Interrupted
+transitions restore their final target values. New installations and upgrades from 0.2 (which saved
+no runtime values) start stopped and need one initial activation after configuring presets.
+Enable **Start on boot** and **Watchdog** in the app settings for automatic host/process recovery.
+
+Corrupt or unsupported stored state prevents startup; it does not silently enable default values.
+Stopping output stops packets; the gateway may hold its last state. Turn lights off
 first if that is the intended result. ArtDmx does not confirm physical state.
 
 Output is manual unicast to configured destinations. Existing universe 0 mappings are preserved.
@@ -20,4 +30,4 @@ UDP port 6454 must be available. Discovery sends ArtPoll only when requested and
 the patch. RDM and automatic fixture-personality detection are not implemented.
 
 Profile exports contain relative offsets without installation addresses. Use the advanced editor's
-project download for a complete private backup. There is no automatic community-library publishing.
+project download for a private configuration backup. A Supervisor app backup also includes runtime state. There is no automatic community-library publishing.

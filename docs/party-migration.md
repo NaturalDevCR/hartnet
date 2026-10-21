@@ -26,8 +26,10 @@ Reload the integration to register the additional lights; preserve obsolete numb
 5. Dry-run the coordinator and verify the effective party target set. A full party run also starts
    audio and should be an intentional user test.
 
-App restarts stop output and reset runtime values. This experimental behavior requires restoring
-presets and explicitly enabling output after an app restart; a Core-only restart leaves the app running.
+From 0.3 onward, app restarts restore presets and the previous output intent automatically. A
+manual stop remains stopped. The one-time upgrade from 0.2 needs the captured runtime presets
+restored before enabling output, since that version saved only the patch. Enable Start on boot
+and Watchdog for host/process recovery. A Core-only restart leaves the independent app running.
 
 ## Rollback
 

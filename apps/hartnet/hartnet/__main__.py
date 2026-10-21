@@ -12,7 +12,7 @@ from .server import create_app
 
 def main():
     parser = argparse.ArgumentParser(description="HartNet app")
-    parser.add_argument("--dev", action="store_true", help="API sin token, solo en loopback")
+    parser.add_argument("--dev", action="store_true", help="Token-free API, loopback only")
     parser.add_argument("--port", type=int, default=8099)
     parser.add_argument("--data", default="/data/project.json")
     args = parser.parse_args()

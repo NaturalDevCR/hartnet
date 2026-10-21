@@ -31,6 +31,14 @@ with sync_playwright() as playwright:
     control.fill("87")
     control.press("Tab")
     page.wait_for_function("document.querySelector('#inspector input[type=number]').value === '87'")
+    # External HA/API changes appear in the open inspector on the next poll.
+    snapshot = page.request.get("http://127.0.0.1:8099/api/state").json()
+    speed = next(f for f in snapshot["project"]["fixtures"] if f["name"] == "Party Derby 1 Speed")
+    response = page.request.post(
+        f"http://127.0.0.1:8099/api/fixtures/{speed['id']}/command", data={"values": {"number_1": 93}}
+    )
+    assert response.ok
+    expect(page.locator("#inspector input[type=number]")).to_have_value("93", timeout=7000)
     page.get_by_role("button", name="Universe patch").click()
     assert page.locator(".slot").count() == 512
     assert page.locator(".slot.used").count() == 26
@@ -55,6 +63,7 @@ with sync_playwright() as playwright:
     assert page.locator("html").get_attribute("lang") == "es"
     page.locator('[data-tab="settings"]').click()
     page.get_by_role("heading", name="Nodos y conexiones").wait_for()
+    page.get_by_role("heading", name="Recuperación tras reinicios").wait_for()
     page.get_by_role("button", name="＋ Agregar nodo").click()
     page.locator('#editor input[name="host"]').fill("invalid")
     page.get_by_role("button", name="Guardar cambios").click()
@@ -62,6 +71,7 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Cerrar", exact=True).click()
     page.locator("#language").select_option("en")
     page.get_by_role("heading", name="Nodes and connections").wait_for()
+    page.get_by_role("heading", name="Restart recovery").wait_for()
     page.get_by_role("button", name="＋ Add node").click()
     page.locator('#editor input[name="host"]').fill("invalid")
     page.get_by_role("button", name="Save changes").click()
