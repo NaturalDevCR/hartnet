@@ -42,9 +42,7 @@ def atomic_save(path, project):
 
 
 def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
-    require(
-        dev or isinstance(token, str) and len(token) >= 16, "Configura api_token con al menos 16 caracteres"
-    )
+    require(dev or isinstance(token, str) and len(token) >= 16, "Set api_token to at least 16 characters")
     path = Path(data_path)
     if project is None:
         project = json.loads(path.read_text()) if path.exists() else empty_project()
@@ -60,9 +58,9 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
         bearer = request.headers.get("Authorization", "")
         authorized = bool(token) and hmac.compare_digest(bearer, f"Bearer {token}")
         if not (ingress or development or request.path.startswith("/api/") and authorized):
-            raise web.HTTPUnauthorized(text="Acceso mediante Home Assistant Ingress o token de API requerido")
+            raise web.HTTPUnauthorized(text="Home Assistant Ingress or an API token is required")
         if request.method not in {"GET", "HEAD"}:
-            require(request.content_type == "application/json", "Content-Type application/json requerido")
+            require(request.content_type == "application/json", "Content-Type application/json required")
             # Cross-origin scripts cannot mutate the API with a form POST. No permissive CORS.
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
                 raise web.HTTPForbidden(text="Cross-site request rejected")
@@ -82,7 +80,7 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
         except (ValidationError, ValueError, TypeError, KeyError, RecursionError) as err:
             return web.json_response({"error": str(err)}, status=400)
         except OSError as err:
-            return web.json_response({"error": f"No se pudo completar la operación: {err}"}, status=503)
+            return web.json_response({"error": f"Could not complete operation: {err}"}, status=503)
 
     app = web.Application(middlewares=[errors, security], client_max_size=1_000_000)
     app[ENGINE] = Engine(project, bind_port=bind_port)
@@ -95,8 +93,8 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
         return web.json_response(app[ENGINE].snapshot())
 
     async def commit(candidate):
-        require(not app[ENGINE].enabled, "Detén la salida antes de cambiar la configuración")
-        require(isinstance(candidate, dict), "Proyecto inválido")
+        require(not app[ENGINE].enabled, "Stop output before changing configuration")
+        require(isinstance(candidate, dict), "Invalid project")
         candidate = deepcopy(candidate)
         # The installation identity survives importing a different patch or backup.
         candidate["id"] = app[ENGINE].project["id"]
@@ -112,7 +110,7 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
 
     async def legacy_preview(request):
         body = await request.json()
-        require(type(body.get("scalars_as_numbers", False)) is bool, "scalars_as_numbers: booleano requerido")
+        require(type(body.get("scalars_as_numbers", False)) is bool, "scalars_as_numbers: boolean required")
         result = await asyncio.to_thread(
             import_legacy, body.get("yaml"), body.get("scalars_as_numbers", False)
         )
@@ -128,17 +126,17 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
         bundle = await request.json()
         require(
             bundle.get("format") == "hartnet-profiles" and bundle.get("schema_version") == 1,
-            "Formato de perfiles incompatible",
+            "Incompatible profile format",
         )
-        require(isinstance(bundle.get("profiles"), list), "profiles: lista requerida")
+        require(isinstance(bundle.get("profiles"), list), "profiles: list required")
         async with app[LOCK]:
             candidate = deepcopy(app[ENGINE].project)
             existing = {p["id"]: p for p in candidate["profiles"]}
             for profile in bundle["profiles"]:
-                require(isinstance(profile, dict) and isinstance(profile.get("id"), str), "Perfil inválido")
+                require(isinstance(profile, dict) and isinstance(profile.get("id"), str), "Invalid profile")
                 require(
                     profile["id"] not in existing or existing[profile["id"]] == profile,
-                    "Existe un perfil diferente con el mismo ID; usa un ID nuevo",
+                    "A different profile already has this ID; use a new ID",
                 )
                 existing[profile["id"]] = profile
             candidate["profiles"] = list(existing.values())
@@ -153,7 +151,7 @@ def create_app(data_path, token, *, dev=False, project=None, bind_port=6454):
 
     async def output(request):
         body = await request.json()
-        require(type(body.get("enabled")) is bool, "enabled: booleano requerido")
+        require(type(body.get("enabled")) is bool, "enabled: boolean required")
         async with app[LOCK]:
             if body["enabled"]:
                 await app[ENGINE].start()

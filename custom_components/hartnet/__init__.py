@@ -39,7 +39,7 @@ class HartNetCoordinator(DataUpdateCoordinator):
         try:
             state = await self.client.request(f"fixtures/{fixture_id}/command", command)
         except (ClientError, TimeoutError, ValueError) as err:
-            raise HomeAssistantError("La app HartNet rechazó el comando") from err
+            raise HomeAssistantError("The HartNet app rejected the command") from err
         self.async_set_updated_data(state)
 
 

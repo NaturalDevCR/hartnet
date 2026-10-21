@@ -40,7 +40,7 @@ class Engine:
         return self.task is not None and not self.task.done()
 
     def load(self, project):
-        require(not self.enabled, "Detén la salida antes de modificar el patch")
+        require(not self.enabled, "Stop output before editing the patch")
         self.project = validate_project(project)
         self.profiles = {p["id"]: p for p in self.project["profiles"]}
         self.fixtures = {f["id"]: f for f in self.project["fixtures"]}
@@ -67,16 +67,16 @@ class Engine:
         )
 
     def command(self, fixture_id, command):
-        require(fixture_id in self.fixtures, "Equipo inexistente")
+        require(fixture_id in self.fixtures, "Fixture does not exist")
         require(
             isinstance(command, dict)
             and not set(command) - {"on", "brightness", "color", "values", "transition"},
-            "Comando inválido",
+            "Invalid command",
         )
         fixture = self.fixtures[fixture_id]
         state = deepcopy(self.states[fixture_id])
         if "on" in command:
-            require(type(command["on"]) is bool, "on: booleano requerido")
+            require(type(command["on"]) is bool, "on: boolean required")
             state["on"] = command["on"]
         if "brightness" in command:
             integer(command["brightness"], 0, 255, "brightness")
@@ -85,32 +85,32 @@ class Engine:
             color = command["color"]
             require(
                 isinstance(color, list) and len(color) == len(self.color_controls(fixture)),
-                "Color incompatible",
+                "Incompatible color",
             )
             for value in color:
                 integer(value, 0, 255, "color")
             state["color"] = color
         values = command.get("values", {})
-        require(isinstance(values, dict), "values: objeto requerido")
+        require(isinstance(values, dict), "values: object required")
         controls = {c["id"]: c for c in self.controls(fixture)}
         for key, value in values.items():
             require(
                 key in controls and controls[key]["kind"] in {"number", "switch", "select"},
-                "Control no editable",
+                "Control is not editable",
             )
             control = controls[key]
             maximum = 256 ** len(control["slots"]) - 1
             integer(value, control.get("min", 0), control.get("max", maximum), key)
             if control["kind"] == "select":
-                require(value in [o["value"] for o in control["options"]], "Opción desconocida")
+                require(value in [o["value"] for o in control["options"]], "Unknown option")
             if control["kind"] == "switch":
                 require(
                     value in (control.get("min", 0), control.get("max", maximum)),
-                    "switch requiere mínimo o máximo",
+                    "switch requires minimum or maximum",
                 )
             state["values"][key] = value
         transition = command.get("transition", 0)
-        require(type(transition) in (int, float) and 0 <= transition <= 999, "transition: 0–999 segundos")
+        require(type(transition) in (int, float) and 0 <= transition <= 999, "transition: 0–999 seconds")
         now = time.monotonic()
         previous = self.render_fixture(fixture, now)
         self.states[fixture_id] = state
@@ -181,7 +181,7 @@ class Engine:
     async def start(self):
         if self.enabled:
             return
-        require(self.project["fixtures"], "Agrega equipos antes de activar la salida")
+        require(self.project["fixtures"], "Agrega fixtures antes de activar la salida")
         await self.open_socket()
         self.last_error = None
         self._last_sent.clear()

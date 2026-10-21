@@ -1,25 +1,23 @@
-# Instalación local en Home Assistant OS
+# Home Assistant OS installation
 
-1. Copia esta carpeta completa a `/addons/hartnet` de tu instalación.
-2. En Ajustes → Apps → Tienda → menú, busca actualizaciones y abre **HartNet** en apps locales.
-3. Instala la app y configura `api_token` con un valor aleatorio de al menos 16 caracteres.
-4. Inicia y abre la interfaz. Importa tu bloque YAML y revisa la vista previa antes de guardarlo.
-5. Instala también `custom_components/hartnet` en `/config/custom_components/hartnet`,
-   reinicia HA y agrega **HartNet** en Ajustes → Dispositivos y servicios.
-6. Usa host `127.0.0.1`, puerto `8099` y el mismo token. La app utiliza la red del host.
-7. Detén o deshabilita el emisor anterior y revisa el patch antes de activar la salida.
+1. Add `https://github.com/NaturalDevCR/hartnet` to the Apps store repositories and install HartNet.
+   For local development, copy this complete directory to `/addons/hartnet` and refresh local apps.
+2. Set `api_token` to a random value of at least 16 characters, start the app, and open its web UI.
+3. Choose English or Spanish using the language selector. The browser preference is used initially.
+4. Import your YAML or create a patch. Review the preview before saving.
+5. Install `custom_components/hartnet` through HACS or copy it to `/config/custom_components/hartnet`.
+   Restart HA and add HartNet under Settings → Devices & services.
+6. Use host `127.0.0.1`, port `8099` and the same token. The app uses host networking.
+7. Stop the previous sender and review every slot before enabling output.
 
-La app guarda la configuración en `/data/project.json` y la versión anterior en
-`/data/project.previous.json`. Cada inicio conserva el patch y comienza con salida detenida.
-Los valores de ejecución no se restauran. Detener salida cesa los paquetes; el gateway
-puede mantener el último estado según su configuración. Apaga las luces antes de detener
-si ese es el efecto que necesitas. No existe confirmación del estado físico por ArtDmx.
+The app saves `/data/project.json` and the preceding version as `/data/project.previous.json`.
+Every app startup preserves the patch and starts with output stopped. Runtime values are not
+restored. Stopping output stops packets; the gateway may hold its last state. Turn lights off
+first if that is the intended result. ArtDmx does not confirm physical state.
 
-La salida es unicast manual: solo a los destinos configurados. El universo 0 de instalaciones
-existentes se conserva. El puerto UDP 6454 debe estar libre. El descubrimiento envía ArtPoll
-únicamente cuando se solicita y no modifica el patch. RDM y la detección automática de
-personalidades aún no están implementados.
+Output is manual unicast to configured destinations. Existing universe 0 mappings are preserved.
+UDP port 6454 must be available. Discovery sends ArtPoll only when requested and does not alter
+the patch. RDM and automatic fixture-personality detection are not implemented.
 
-Exportar perfiles produce offsets relativos, sin IP ni direcciones de instalación. Para una
-copia íntegra del proyecto usa el editor avanzado y conserva el JSON en un lugar privado.
-No se incluye publicación en una biblioteca comunitaria ni instalación HACS en esta versión.
+Profile exports contain relative offsets without installation addresses. Use the advanced editor's
+project download for a complete private backup. There is no automatic community-library publishing.

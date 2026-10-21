@@ -1,3 +1,3 @@
 """HartNet: a standalone, profile-based Art-Net engine."""
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"

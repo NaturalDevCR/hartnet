@@ -1,5 +1,5 @@
 # HartNet
 
-App experimental de control Art-Net por perfiles. La interfaz se abre mediante
-Home Assistant Ingress. Requiere configurar `api_token` (mínimo 16 caracteres)
-antes de iniciar. Consulta `DOCS.md` antes de habilitar salida DMX.
+Experimental profile-based Art-Net control with an English/Spanish interface through
+Home Assistant Ingress. Configure `api_token` (at least 16 characters) before starting.
+Read [DOCS.md](DOCS.md) before enabling DMX output.

@@ -1,77 +1,74 @@
-# Arquitectura
+# Architecture
 
-El destino inicial es Home Assistant OS. La app ejecuta el motor y la interfaz;
-la integración transforma sus funciones en dispositivos y entidades nativas.
+The initial target is Home Assistant OS. The app runs the engine and interface; the native
+integration turns profile functions into devices and entities.
 
 ```mermaid
 flowchart LR
-  UI[Interfaz HartNet] -->|Ingress autenticado| API[API de la app]
-  HA[Entidades de Home Assistant] -->|HTTP con token| API
-  API --> P[Perfiles y patch validados]
-  P --> E[Motor de universos y transiciones]
-  E -->|ArtDmx unicast| N[Nodos Art-Net]
-  N --> D[Equipos DMX]
-  API -->|Solicitud explícita ArtPoll| N
+  UI[HartNet UI] -->|Authenticated Ingress| API[App API]
+  HA[Home Assistant entities] -->|Token-authenticated HTTP| API
+  API --> P[Validated profiles and patch]
+  P --> E[Universe and transition engine]
+  E -->|ArtDmx unicast| N[Art-Net nodes]
+  N --> D[DMX fixtures]
+  API -->|Explicit ArtPoll request| N
 ```
 
-## Por qué app más integración
+## App and integration
 
-| Opción | Ventajas | Costes |
+| Approach | Benefits | Costs |
 | --- | --- | --- |
-| Solo integración con panel | Una instalación, autenticación/API nativa | Motor y fades comparten ciclo de vida con HA |
-| Solo app con MQTT | Motor independiente, distribución HA OS | Broker adicional y limitaciones de representación por descubrimiento |
-| App más integración | Motor independiente, UI Ingress y entidades semánticas | Instalar y versionar dos piezas |
+| Integration with panel | One installation, native authentication/API | Engine and fades share HA's lifecycle |
+| App with MQTT | Independent engine, HA OS distribution | Extra broker and discovery representation limits |
+| App with integration | Independent engine, Ingress UI and semantic entities | Two separately installed components |
 
-Se elige la tercera para el alcance solicitado. La separación también permite ejecutar
-la misma app junto a HA Container en el futuro. Un panel personalizado puede ofrecer una
-UI moderna sin app; la elección se debe al ciclo de vida del motor, no a una limitación
-visual de Home Assistant.
+HartNet uses the third option. This also allows running the app beside HA Container in the future.
+Custom HA panels can provide a modern UI; the engine lifecycle motivates this separation.
 
-Referencias: [apps](https://developers.home-assistant.io/docs/apps),
+References: [apps](https://developers.home-assistant.io/docs/apps),
 [Ingress](https://developers.home-assistant.io/docs/apps/presentation/),
 [config entries](https://developers.home-assistant.io/docs/config_entries_index/),
-[paneles personalizados](https://contributors.home-assistant.io/frontend/custom-ui/panel/).
+[custom panels](https://contributors.home-assistant.io/frontend/custom-ui/panel/).
 
-## Modelo
+## Model
 
-- **Nodo:** endpoint unicast y parámetros de transmisión. No implica un fixture físico.
-- **Perfil:** funciones y offsets relativos, reutilizable y exportable.
-- **Equipo instalado:** instancia con ID persistente, nombre, nodo, universo y canal inicial.
-- **Control:** tipo, slots ordenados MSB→LSB, límites, default y valores explícitos.
-- **Luz:** representación agrupada de intensidad/color dentro de un equipo.
-- **Universo de salida:** un buffer compartido por destino y universo. No se generan
-  emisores independientes que sobrescriban otros controles del mismo universo.
+- **Node:** unicast endpoint and transmission settings; not necessarily a physical fixture.
+- **Profile:** reusable and exportable functions with relative offsets.
+- **Fixture:** persistent ID, name, node, universe and start channel.
+- **Control:** kind, ordered MSB→LSB slots, limits, default and explicit values.
+- **Light:** grouped intensity/color representation inside a fixture.
+- **Output universe:** one composed buffer per destination and universe.
 
-Los slots separados permiten `pan=[1,8]`. Macros documentados se representan con select;
-valores continuos o desconocidos con number. Fan, cover, valve, button, sensor y event
-requieren adaptadores semánticos y contratos de estado adicionales antes de anunciarse.
+Separate slots support mappings such as `pan=[1,8]`. Documented macros can use selects;
+continuous or unknown values use numbers. Fan, cover, valve, button, sensor and event domains
+need additional semantic adapters and state contracts before being advertised.
 
-La versión inicial usa valores DMX enteros. Escalas físicas, rangos con funciones
-condicionales, matrices y ruedas avanzadas son extensiones pendientes del formato.
+Values are DMX integers. Physical scales, conditional ranges, matrices and advanced wheels
+remain future extensions.
 
-## Estado y red
+## State and network
 
-ArtDmx es UDP sin acuse físico. La UI informa salida activa/detenida y estado asumido;
-no presenta un nodo configurado como «online» por el simple hecho de haber enviado bytes.
-El estado de los canales es el deseado, no una medida del aparato.
+ArtDmx is UDP without physical acknowledgement. The UI reports active/stopped output and
+assumed state. Sending bytes does not establish that a node is online.
 
-La app conserva un socket UDP y limita la frecuencia por universo/nodo. El puerto local
-es 6454. El descubrimiento se solicita expresamente y usa el mismo socket. Las respuestas
-se identifican por IP y BindIndex y se muestran con el instante de última observación.
-Todavía no hay caducidad periódica ni mantenimiento de suscripciones Art-Net 4.
+One UDP socket uses local port 6454, with bounded transmission frequency. Explicit discovery
+shares the socket and identifies replies by IP and BindIndex, recording last observation.
+Periodic expiry and Art-Net 4 subscription maintenance are not implemented.
 
-La configuración se modifica con salida detenida. Se valida antes de guardar y se escribe
-mediante archivo temporal, fsync y reemplazo atómico. Se conserva la versión anterior.
-La identidad de la instalación sobrevive al importar otro patch. Los valores de ejecución
-son volátiles; cada arranque requiere activar explícitamente el emisor.
+Project edits require stopped output. Validation precedes a temporary-file write, fsync and atomic
+replacement; the previous project is retained. Installation identity survives importing another
+patch. Runtime values are volatile and output requires explicit activation after every app startup.
 
-## Exportación
+## Languages and exports
 
-`hartnet-profiles` versión 1 contiene solo perfiles con offsets relativos. No contiene
-nodos, universo, canal inicial, token ni datos de HA. Un backup completo de proyecto sí
-incluye direcciones y se ofrece como acción separada. La importación valida versiones y
-rechaza IDs de perfil existentes cuyo contenido sea distinto.
+The UI defaults to English, selects Spanish for a Spanish browser, and stores an explicit choice
+in local browser storage. Only interface strings are translated. User-provided names, enum labels,
+profile content and technical protocol identifiers retain their original values. The Spanish catalog
+is `static/es.json`; repository documentation and default diagnostic messages use English.
 
-Una biblioteca comunitaria posterior debe conservar procedencia y atribución, soportar
-revisión/versionado y respetar las licencias de las fuentes. OFL/GDTF necesitan adaptadores
-explícitos; no se redistribuyen sus colecciones en este repositorio.
+`hartnet-profiles` version 1 includes only relative profiles, without node addresses, universes,
+start channels, tokens or HA data. Full project backup is a separate action. Imports validate
+versions and reject conflicting profile IDs.
+
+A future community library must preserve provenance, attribution, review/versioning and source
+licenses. OFL/GDTF need explicit adapters; their collections are not redistributed here.

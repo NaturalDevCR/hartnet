@@ -98,7 +98,7 @@ def test_exports_exclude_installation(party):
 
 
 def test_legacy_rejects_partial_unsupported_import(legacy_yaml):
-    with pytest.raises(ValidationError, match="Función legacy"):
+    with pytest.raises(ValidationError, match="Unsupported legacy function"):
         import_legacy(legacy_yaml.replace("drgbw", "dxy"))
 
 

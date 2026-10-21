@@ -13,7 +13,7 @@ def art_dmx(universe, data, sequence=1):
     integer(universe, 0, 32767, "universe")
     integer(sequence, 0, 255, "sequence")
     if not 1 <= len(data) <= 512:
-        raise ValueError("ArtDmx necesita 1–512 slots (se añade padding par)")
+        raise ValueError("ArtDmx needs 1–512 slots (even padding is added)")
     payload = bytes(data)
     payload += b"\0" * (max(2, len(payload) + len(payload) % 2) - len(payload))
     return (

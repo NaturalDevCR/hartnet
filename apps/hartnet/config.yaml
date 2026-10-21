@@ -1,8 +1,8 @@
 name: HartNet
-version: "0.1.0"
+version: "0.2.0"
 slug: hartnet
 url: https://github.com/NaturalDevCR/hartnet
-description: "Art-Net con perfiles, mapeos y controles para Home Assistant"
+description: "Art-Net profiles, mapping and controls for Home Assistant"
 arch:
   - aarch64
   - amd64

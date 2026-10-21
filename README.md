@@ -1,89 +1,79 @@
 # HartNet
 
-**Art-Net con perfiles, una interfaz propia y entidades nativas en Home Assistant.**
+**Art-Net profiles, a visual workspace, and native Home Assistant entities.**
 
-Estado: **alpha experimental 0.1.0**. Motor, interfaz y componente de HA implementados;
-la validación con gateways y equipos físicos todavía está pendiente. No es una
-implementación de todos los paquetes de Art-Net.
+Status: **experimental alpha 0.2.0**. The engine, app and HA integration are implemented.
+Physical gateway and fixture validation is ongoing. This is a subset of Art-Net functionality.
 
-![Interfaz HartNet con un patch de ejemplo](docs/images/hartnet.png)
+![HartNet workspace with a sample patch](docs/images/hartnet.png)
 
-HartNet separa el nodo de red, el perfil reutilizable y el equipo instalado. Eso permite
-controlar funciones de cualquier equipo DMX con un mapeo conocido: intensidad y color,
-pan/tilt, velocidad, macros, relés u otros valores. La semántica depende del manual del equipo.
+HartNet separates network nodes, reusable profiles and installed fixtures. With a documented
+DMX mapping, it can control intensity, color, pan/tilt, speed, macros, relays and other values.
+Function semantics come from each fixture's manual.
 
-## Qué incluye
+## Features
 
-- App para Home Assistant OS, con acceso mediante Ingress.
-- Integración configurada desde la UI de HA: `light`, `number`, `select` y `switch`.
-- Interfaz adaptable: equipos, controles, patch de 512 canales, biblioteca y editor de perfiles.
-- Importación con vista previa de un subconjunto explícito de `ha-artnet-led` en modo directo.
-- Canales de 8/16/24/32 bits, con bytes consecutivos o separados y orden configurable.
-- Perfiles JSON exportables sin IP, universo ni canal inicial de la instalación.
-- Salida unicast, FPS limitado por nodo, refresh y transiciones para luces/valores continuos.
-- ArtPoll / ArtPollReply para descubrimiento explícito de nodos, incluyendo BindIndex.
-- Validación de direcciones, colisiones de patch, límites y valores seleccionables.
-- API autenticada, persistencia atómica y copia de la configuración anterior.
+- Home Assistant OS app with authenticated Ingress access.
+- English and Spanish interface, automatic browser-language selection and a saved language switch.
+- Native `light`, `number`, `select` and `switch` entities, configured through the HA UI.
+- Responsive fixture controls, a 512-channel patch, profile library and profile editor.
+- Previewed import of an explicit subset of `ha-artnet-led` direct-mode configuration.
+- 8/16/24/32-bit functions with adjacent or separate bytes and configurable byte order.
+- Portable JSON profiles without installation IPs, universes or start addresses.
+- Unicast output, per-node FPS limits, refresh and transitions for continuous values.
+- Explicit ArtPoll / ArtPollReply discovery, including BindIndex.
+- Address, overlap, range and option validation; authenticated API and atomic project backups.
 
-La salida comienza **detenida en cada arranque**. El patch se guarda; los valores de
-ejecución no se restauran. Las entidades HA aparecen como no disponibles mientras
-la salida esté detenida. No se requiere MQTT.
+Output starts **stopped on every app startup**. The patch is saved; runtime values are volatile.
+HA entities are unavailable while output is stopped. No MQTT broker is required.
+Changing the interface language never translates user-provided names or alters a patch.
 
-## Instalar en Home Assistant OS
+## Install on Home Assistant OS
 
-1. Agrega este repositorio a la tienda de Apps:
-   `https://github.com/NaturalDevCR/hartnet`.
-2. Instala **HartNet**, configura `api_token` con un valor aleatorio de al menos 16 caracteres
-   y abre la interfaz web. No compartas ese token.
-3. En HACS, agrega este mismo repositorio como **Integration**, descarga HartNet y reinicia HA.
-   También puedes copiar `custom_components/hartnet` a `/config/custom_components/hartnet`.
-4. Agrega **HartNet** en Ajustes → Dispositivos y servicios. Usa host `127.0.0.1`,
-   puerto `8099` y el token de la app.
-5. Importa el bloque `light:` o crea nodos, perfiles y equipos. Revisa la vista previa y guarda.
-6. Antes de activar la salida, detén el emisor previo que controle esos mismos canales.
+1. Add `https://github.com/NaturalDevCR/hartnet` to the Apps store repositories.
+2. Install **HartNet**, set `api_token` to a random value of at least 16 characters, and open its UI.
+3. Add this repository to HACS as an **Integration**, download HartNet, and restart HA.
+   Alternatively, copy `custom_components/hartnet` to `/config/custom_components/hartnet`.
+4. Add **HartNet** under Settings → Devices & services. Use host `127.0.0.1`, port `8099`,
+   and the app's API token. Keep that token private.
+5. Import your `light:` block or create nodes, profiles and fixtures. Review and save the patch.
+6. Stop any previous sender controlling the same destination and universe before enabling output.
 
-La instalación local de la app también está descrita en [DOCS.md](apps/hartnet/DOCS.md).
-HACS y Supervisor no se ejecutan en las pruebas unitarias; la instalación y el
-funcionamiento real se documentan separadamente de las pruebas automatizadas.
+See [app installation details](apps/hartnet/DOCS.md). Supervisor/HACS installation checks
+are documented separately from automated tests.
 
-## Importar desde ha-artnet-led
+## Import from ha-artnet-led
 
-Se importa `artnet-direct`: nodo, puerto, universos, FPS, refresh, tramas completas/parciales,
-layout RGB/RGBW/RGBWW/CCT, dimmer, binary, constantes, tamaños y orden de bytes.
-Los universos no se renumeran, incluido el universo 0 usado por gateways existentes.
+The importer supports `artnet-direct`: nodes, ports, universes, FPS, refresh, full/partial frames,
+RGB/RGBW/RGBWW/CCT layouts, dimmers, binary functions, constants, resolution and byte order.
+Universes retain their original numbers, including universe 0.
 
-La opción **Convertir dimmers independientes a number** permite representar velocidad y
-macros como controles numéricos. Se elige expresamente en la vista previa. Un macro solo
-se convierte en `select` cuando el usuario configura sus valores y nombres documentados.
+**Convert standalone dimmers to number entities** makes speed and macro channels numeric.
+Leave it unchecked when a dimmer must remain compatible with `light.turn_on` automations.
+A macro becomes a `select` only after its documented values and labels are configured.
 
-El importador rechaza funciones no implementadas (`xy`, hue/saturation, temperatura en un
-canal, blanco autocalculado RGB), otros transportes y overrides de destino. No omite esos
-datos para generar una configuración aparentemente completa. Las transiciones por comando
-funcionan; el valor predeterminado legacy por equipo todavía no se importa.
+Unsupported functions (`xy`, hue/saturation, single-channel temperature, calculated RGB white),
+other transports and destination overrides are rejected explicitly. Per-command transitions work;
+legacy per-fixture default transitions are not imported yet. High-resolution color uses the whole
+range, while the legacy component scales 8-bit steps. Constants preserve legacy scaling.
+Existing entity IDs are neither adopted nor renamed; automation migration is a separate step.
 
-Los valores de color de alta resolución usan todo el rango; el componente legacy escala
-valores de 8 bits. Las constantes sí conservan su escalado legacy. Los IDs antiguos no se
-adoptan ni se renombran. Las automatizaciones existentes requieren una migración aparte.
+## Profiles and devices
 
-## Perfiles y dispositivos
+Profiles describe functions with relative slots ordered most-significant byte first. For example,
+`slots: [1, 8]` is a 16-bit value with coarse at slot 1 and fine at slot 8.
 
-Un perfil contiene funciones con slots relativos ordenados de byte más significativo a
-menos significativo. Por ejemplo, `slots: [1, 8]` representa un valor de 16 bits cuyo byte
-coarse está en el primer canal del equipo y el fine en el octavo.
+`number`, `select` and `switch` create separate controls in the HA device. Color and dimmer
+functions form a light; `constant` holds a fixed value. Select functions use explicit representative
+values; conditional ranges, advanced wheels and full professional fixture formats remain future work.
 
-`number`, `select` y `switch` crean controles separados dentro del dispositivo HA.
-Las funciones de color y dimmer se agrupan como una luz. `constant` fija un valor.
-Una función `select` elige valores representativos explícitos; no implementa aún rangos
-variables, funciones condicionales ni ruedas completas de un formato profesional de fixtures.
+Editing a shared profile affects every fixture using it. New entities appear on the next poll.
+Reload the HA integration after changing types, removing controls or editing existing profile
+metadata. Obsolete registry entries become unavailable and are not automatically deleted.
 
-Editar un perfil compartido afecta a todos sus equipos. Las entidades nuevas se descubren
-en el siguiente sondeo. Para cambios de tipo, eliminación de controles o metadatos de un
-perfil existente, recarga la integración desde HA. Las entidades obsoletas se deshabilitan
-por disponibilidad, pero sus entradas de registro no se borran automáticamente.
+## Development
 
-## Desarrollo y pruebas
-
-Motor y app requieren Python 3.13+. La integración se prueba con HA **2026.10.2 / Python 3.14**.
+The engine/app require Python 3.13+. Integration tests use **HA 2026.10.2 / Python 3.14**.
 
 ```sh
 uv venv --python 3.13
@@ -93,11 +83,8 @@ uv pip install --python .venv/bin/python -e '.[test]'
 .venv/bin/python -m hartnet --dev --data data/project.json
 ```
 
-Abre `http://127.0.0.1:8099`. `--dev` permite acceso sin token únicamente por loopback;
-no se utiliza en la app de Home Assistant. El ejemplo distribuido utiliza `192.0.2.30`,
-una dirección de documentación, y no representa un gateway real.
-
-Pruebas con Home Assistant real, en un entorno separado:
+Open `http://127.0.0.1:8099`. Development authentication bypass is restricted to loopback.
+The bundled sample uses documentation-only address `192.0.2.30`.
 
 ```sh
 uv venv .venv-ha --python 3.14
@@ -106,30 +93,28 @@ uv pip install --python .venv-ha/bin/python -e . pytest-homeassistant-custom-com
 docker build -t hartnet:dev apps/hartnet
 ```
 
-`scripts/check_ui.py` usa Playwright y una instalación local de Chrome en macOS para
-comprobar importación, patch, edición y anchuras de 1440/390/320 px. No activa salida DMX.
-Las pruebas de red se limitan a loopback; el estado ArtDmx es asumido, sin confirmación física.
+`scripts/check_ui.py` uses Playwright and locally installed Chrome on macOS. It checks both
+languages, persistence, imports, patch, controls, profile editing and 1440/390/320px layouts.
+It never enables DMX. Network tests are restricted to loopback.
 
-## Límites y siguientes entregas
+## Limits and roadmap
 
-El emisor actual es **unicast manual**, con compatibilidad legacy, no un controlador Art-Net 4
-completo con suscripciones y anuncios propios. RDM, ArtDataRequest, recepción/merge DMX,
-ArtSync, ArtTrigger, timecode, sACN, KiNet, importación OFL/GDTF y biblioteca comunitaria están
-pendientes. No se realiza barrido de canales para adivinar sus funciones.
+The current sender uses manual unicast. It is not a complete Art-Net 4 controller with subscriptions
+and announcements. RDM, ArtDataRequest, DMX input/merge, ArtSync, ArtTrigger, timecode, sACN,
+KiNet, OFL/GDTF imports and a community library are not implemented. No channel scanning is used
+to guess fixture functions.
 
-Los huecos se emiten a 0. Detener la salida cesa los paquetes; el gateway puede mantener el
-último estado. No hay un blackout universal: apagar una luz no modifica sus controles
-numéricos, selectores ni relés. Los valores de reposo deben definirse en cada perfil.
+Unassigned slots are sent as zero. Stopping output stops packets; a gateway may hold the last
+state. Turning a light off does not reset its independent numbers, selectors or relays. Define
+resting values explicitly. ArtDmx does not acknowledge physical fixture state.
 
-Consulta el [análisis de referencia](docs/reference-review.md), la
-[arquitectura](docs/architecture.md) y el [plan de validación](docs/validation.md).
+See the [architecture](docs/architecture.md), [validation record](docs/validation.md),
+and [reversible Party Button migration](docs/party-migration.md).
 
-## Referencias
+## Attribution
 
-Diseño independiente informado por [Breina/ha-artnet-led](https://github.com/Breina/ha-artnet-led)
-y la [especificación oficial Art-Net](https://art-net.org.uk/downloads/art-net.pdf).
-El código del repositorio de referencia no se incluye como dependencia ni se ha copiado.
+Protocol reference: [official Art-Net specification](https://art-net.org.uk/downloads/art-net.pdf).
 
 **Art-Net™ Designed by and Copyright Artistic Licence**.
 
-Código propio bajo [licencia MIT](LICENSE). Los perfiles de terceros conservan su atribución y licencia.
+Original code: [MIT](LICENSE). Third-party profiles retain their attribution and licenses.

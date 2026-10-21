@@ -1,60 +1,55 @@
-# Validación y despliegue experimental
+# Experimental validation and deployment
 
-## Pruebas automatizadas
+## Automated coverage
 
-- Importación del patch de referencia: ocho equipos, universo 0, tramas completas,
-  direcciones y constantes exactas; conversión opcional de cuatro dimmers a number.
-- Frame esperado de RGBW, controles independientes y huecos sin asignar.
-- Enteros de 8/16/24/32 bits y bytes separados.
-- Rechazo atómico de comandos, solapamientos, desbordamientos y opciones desconocidas.
-- Exclusión de direcciones de instalación al exportar perfiles.
-- ArtDmx: endianness, padding par, secuencia y extremos de la dirección de 15 bits.
-- ArtPollReply mínimo de 207 bytes y nodos con BindIndex.
-- Loopback UDP real: transiciones, límite de FPS, refresh y cese del emisor.
-- API: autenticación, importación sin salida, persistencia y rechazo de cambios con salida activa.
-- Home Assistant 2026.10.2 real, app HTTP real y tráfico Art-Net restringido a loopback:
-  config flow, entidades nativas y llamadas de servicio.
-- Navegador: importación, control numérico, patch, editor de perfiles y anchuras de
-  1440, 390 y 320 px, sin activar DMX.
-- Construcción de la imagen Docker de la app.
+- Eight-fixture sample import: universe 0, full frames, exact addresses/constants and optional
+  conversion of standalone dimmers to numbers.
+- RGBW output, independent controls, unmapped slots and 8/16/24/32-bit separate bytes.
+- Atomic command rejection, overlap detection, bounds and unknown options.
+- Profile export without installation addresses.
+- ArtDmx endianness, even padding, sequencing and 15-bit address boundaries.
+- Minimum 207-byte ArtPollReply and BindIndex nodes.
+- Real UDP loopback: transitions, FPS limits, refresh and sender shutdown.
+- API authentication, preview without output, persistence and rejection of edits during output.
+- Real HA 2026.10.2 with HTTP app and loopback Art-Net: config flow serialization, native
+  entities and service calls.
+- Browser checks: both languages, saved preference, unchanged user names, imports, number
+  controls, patch, profile editor and 1440/390/320px layouts, without enabling DMX.
+- App Docker image build.
 
-Estos checks no sustituyen una instalación real de Supervisor/Ingress ni una prueba
-con un gateway. Los tests de HA se ejecutan con pytest-homeassistant-custom-component;
-el harness añade el directorio del proyecto al paquete de componentes del entorno.
+Automated checks do not replace Supervisor/Ingress installation or physical hardware tests.
+HA tests use pytest-homeassistant-custom-component and expose the component directory to HA.
 
-La primera instalación real de la app en HA OS amd64 completó construcción, arranque,
-API a través de Ingress, carga de ocho equipos y exportación de tres perfiles, con
-salida detenida y cero paquetes. La descarga del componente por HACS también se verificó.
-El componente 0.1.1 añade cobertura de serialización del formulario con probatio tras
-detectar un error del validador en el alta real.
-Tras reiniciar HA con autorización del usuario se completó el config flow real:
-la integración quedó cargada y creó cuatro luces RGBW y cuatro números, sin reemplazar
-los IDs de las entidades legacy. Se verificó de nuevo salida detenida y cero paquetes.
-Las entidades nuevas figuraban como no disponibles por ese estado explícito del motor.
+## Installation observations
 
-## Secuencia de prueba en una instalación existente
+The first HA OS amd64 installation completed app build/start, Ingress API access, eight-fixture
+import and three-profile export with output stopped and zero packets. HACS download was verified.
+Integration 0.1.1 fixed config-flow serialization, with probatio regression coverage. After an
+authorized HA restart the integration loaded, creating four RGBW lights and four numbers.
+Legacy entity IDs were preserved. New entities correctly remained unavailable while output was stopped.
 
-1. Inventariar versión, apps y entidades del emisor anterior.
-2. Conservar configuración y registros existentes. Instalar HartNet en paralelo con
-   sus propios IDs; no renombrar ni cambiar automatizaciones en esta fase.
-3. Verificar Ingress, importación y perfiles con el emisor HartNet detenido.
-4. Instalar el componente y comprobar entidades sin paquetes hacia el gateway.
-5. Revisar consumidores y estado real antes de un cambio de emisor.
-6. En una ventana de prueba, suspender el emisor anterior y probar un equipo y canal
-   conocido. Verificar macros, velocidad y apagado, además de color/brillo.
-7. Volver al emisor anterior si la equivalencia no está comprobada.
+Version 0.2.0 adds English/Spanish UI and English repository documentation. The Party Button
+migration is described separately in [party-migration.md](party-migration.md).
 
-El test del nuevo emisor sobre un universo completo transmite todos sus slots. No debe
-interpretarse «un equipo de prueba» como garantía de aislamiento si se mantienen otros
-controles del mismo universo sin un plan de valores. Para coexistir, usar universos o
-destinos separados, o definir de forma expresa un único dueño del buffer.
+## Existing-installation test sequence
 
-## Pendiente antes de una versión estable
+1. Inventory versions, apps, previous sender and consumers.
+2. Preserve configuration and registry metadata; install using separate IDs.
+3. Check Ingress, imports and profiles with HartNet output stopped.
+4. Load the integration and inspect entities without gateway traffic.
+5. Compare the full universe and runtime presets before changing senders.
+6. Stop the previous sender, then enable HartNet and verify known channels, macros, speed,
+   color, brightness and shutdown behavior.
+7. Restore the previous sender if equivalence is not established.
 
-- Verificar amd64 y aarch64 en Supervisor y la instalación por HACS.
-- Validar hardware y las tablas reales de los equipos.
-- Más tests de CCT, RGBWW, recarga, evolución de perfiles y pérdida de conectividad.
-- Acciones momentáneas, rangos de macros, unidades físicas y políticas de reposo.
-- RDM/ArtDataRequest, entrada DMX, arbitraje de fuentes y ArtSync.
-- Adaptadores sACN/KiNet, importadores OFL/GDTF y catálogo comunitario.
-- Versionado/migraciones del modelo y control de revisiones para ediciones concurrentes.
+A complete universe contains every slot. Testing one fixture does not isolate other controls
+in that universe. Use separate destinations/universes or explicitly maintain one buffer owner.
+
+## Before a stable release
+
+- More amd64/aarch64 Supervisor and HACS validation, physical fixtures and channel tables.
+- Broader CCT/RGBWW, reload, profile evolution and connectivity-loss coverage.
+- Momentary actions, macro ranges, physical units and resting-state policies.
+- RDM/ArtDataRequest, DMX input, source arbitration and ArtSync.
+- sACN/KiNet, OFL/GDTF and community catalog adapters.
+- Schema migrations and revision-based concurrent edit protection.
