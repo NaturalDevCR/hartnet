@@ -69,6 +69,14 @@ healthy universes. Unexpected sender task failures produce a failing health prob
 project data. Runtime state and output intent are persisted together with the project; no cleanup
 handler is needed for crash recovery.
 
+The live HA OS app was upgraded to 0.3.0 after backing up and restoring the 0.2 runtime presets.
+An actual app restart with active output restored all values and resumed packets automatically.
+A second app restart after an explicit stop preserved all values and sent zero packets. The final
+output was restored to active. Complete 512-slot buffers matched before and after both restarts.
+Supervisor settings confirmed automatic boot and watchdog enabled, and the health probe returned
+200. The existing Party Button labels/entities remained available, with unchanged speed presets.
+Home Assistant Core, audio and timer context were not restarted by these checks.
+
 ## Before a stable release
 
 - More amd64/aarch64 Supervisor and HACS validation, physical fixtures and channel tables.

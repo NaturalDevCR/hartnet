@@ -77,7 +77,7 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Save changes").click()
     expect(page.locator("#editor-error")).to_contain_text("IPv4 address required")
     page.get_by_role("button", name="Close", exact=True).click()
-    # Re-import the unchanged public example, leaving a clean preview with zero output.
+    # Re-import the unchanged public mapping; retained values remain offline.
     page.get_by_role("button", name="Import configuration").click()
     page.get_by_role("button", name="Load example configuration").click()
     page.get_by_role("button", name="Review import").click()
