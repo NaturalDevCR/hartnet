@@ -8,9 +8,11 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
+import probatio
 from hartnet.server import ENGINE, create_app
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import ATTR_ENTITY_ID
+from homeassistant.helpers import config_validation as cv
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 TOKEN = "test-ha-api-token-123456789"
@@ -36,6 +38,8 @@ async def test_config_flow_connects_to_actual_app(
     client = await aiohttp_client(app)
     result = await hass.config_entries.flow.async_init("hartnet", context={"source": SOURCE_USER})
     assert result["type"] == "form"
+    fields = probatio.to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
+    assert any(field["name"] == "host" for field in fields)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
