@@ -30,6 +30,10 @@ Legacy entity IDs were preserved. New entities correctly remained unavailable wh
 
 Version 0.2.0 adds English/Spanish UI and English repository documentation. The Party Button
 migration is described separately in [party-migration.md](party-migration.md).
+The live HA OS app and HACS component were updated to 0.2.0. Ingress serves the language
+module, macro-light compatibility profiles are registered, and the prepared resting buffer
+matches the previous sender across all 512 slots. HA configuration validation passed;
+HartNet output remains stopped pending the confirmed Core restart and label cutover.
 
 ## Existing-installation test sequence
 
