@@ -27,6 +27,10 @@ API a través de Ingress, carga de ocho equipos y exportación de tres perfiles,
 salida detenida y cero paquetes. La descarga del componente por HACS también se verificó.
 El componente 0.1.1 añade cobertura de serialización del formulario con probatio tras
 detectar un error del validador en el alta real.
+Tras reiniciar HA con autorización del usuario se completó el config flow real:
+la integración quedó cargada y creó cuatro luces RGBW y cuatro números, sin reemplazar
+los IDs de las entidades legacy. Se verificó de nuevo salida detenida y cero paquetes.
+Las entidades nuevas figuraban como no disponibles por ese estado explícito del motor.
 
 ## Secuencia de prueba en una instalación existente
 
