@@ -22,6 +22,12 @@ Estos checks no sustituyen una instalación real de Supervisor/Ingress ni una pr
 con un gateway. Los tests de HA se ejecutan con pytest-homeassistant-custom-component;
 el harness añade el directorio del proyecto al paquete de componentes del entorno.
 
+La primera instalación real de la app en HA OS amd64 completó construcción, arranque,
+API a través de Ingress, carga de ocho equipos y exportación de tres perfiles, con
+salida detenida y cero paquetes. La descarga del componente por HACS también se verificó.
+El componente 0.1.1 añade cobertura de serialización del formulario con probatio tras
+detectar un error del validador en el alta real.
+
 ## Secuencia de prueba en una instalación existente
 
 1. Inventariar versión, apps y entidades del emisor anterior.

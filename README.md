@@ -6,6 +6,8 @@ Estado: **alpha experimental 0.1.0**. Motor, interfaz y componente de HA impleme
 la validación con gateways y equipos físicos todavía está pendiente. No es una
 implementación de todos los paquetes de Art-Net.
 
+![Interfaz HartNet con un patch de ejemplo](docs/images/hartnet.png)
+
 HartNet separa el nodo de red, el perfil reutilizable y el equipo instalado. Eso permite
 controlar funciones de cualquier equipo DMX con un mapeo conocido: intensidad y color,
 pan/tilt, velocidad, macros, relés u otros valores. La semántica depende del manual del equipo.
