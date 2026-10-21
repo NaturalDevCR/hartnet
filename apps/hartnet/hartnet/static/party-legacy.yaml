@@ -1,0 +1,47 @@
+light:
+  - platform: artnet_led
+    host: 192.0.2.30
+    port: 6454
+    node_type: artnet-direct
+    max_fps: 25
+    refresh_every: 1
+    universes:
+      0:
+        send_partial_universe: false
+        devices:
+          - channel: 1
+            name: Party Spot 1
+            type: rgbw
+            channel_size: 8bit
+            channel_setup: drgbw
+          - channel: 10
+            name: Party Derby 1
+            type: rgbw
+            channel_size: 8bit
+            channel_setup: [d, 0, r, g, b, w]
+          - channel: 23
+            name: Party Derby 1 Macro
+            type: dimmer
+            channel_size: 8bit
+          - channel: 24
+            name: Party Derby 1 Speed
+            type: dimmer
+            channel_size: 8bit
+          - channel: 30
+            name: Party Spot 2
+            type: rgbw
+            channel_size: 8bit
+            channel_setup: drgbw
+          - channel: 40
+            name: Party Derby 2
+            type: rgbw
+            channel_size: 8bit
+            channel_setup: [d, 0, r, g, b, w]
+          - channel: 53
+            name: Party Derby 2 Macro
+            type: dimmer
+            channel_size: 8bit
+          - channel: 54
+            name: Party Derby 2 Speed
+            type: dimmer
+            channel_size: 8bit

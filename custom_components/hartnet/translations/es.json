@@ -1,0 +1,11 @@
+{
+  "title": "HartNet",
+  "config": {
+    "step": {
+      "user": {"title": "Conectar con la app HartNet", "description": "Instala e inicia primero la app HartNet. Usa su token de API. En HA OS la conexión predeterminada es 127.0.0.1:8099.", "data": {"host": "Dirección IPv4", "port": "Puerto", "token": "Token de API"}},
+      "reconfigure": {"title": "Actualizar conexión", "data": {"host": "Dirección IPv4", "port": "Puerto", "token": "Token de API"}}
+    },
+    "error": {"cannot_connect": "No se pudo conectar. Revisa la app, dirección, puerto y token.", "wrong_app": "Esta es otra instalación de HartNet."},
+    "abort": {"already_configured": "Esta app ya está configurada.", "reconfigure_successful": "Conexión actualizada."}
+  }
+}

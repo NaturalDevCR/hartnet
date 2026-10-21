@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HartNet · Art-Net workspace</title>
+  <link rel="stylesheet" href="static/app.css">
+  <script type="module" src="static/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="./"><span class="brand-mark">h<span>·</span></span>hartnet</a>
+      <div class="workspace"><span class="workspace-icon">⌘</span><div>Art-Net workspace<small>Home Assistant</small></div><span class="version">α</span></div>
+      <p class="nav-label">WORKSPACE</p>
+      <nav aria-label="Navegación principal">
+        <button data-tab="fixtures" class="active"><span>▦</span> Equipos <b id="nav-count">0</b></button>
+        <button data-tab="patch"><span>▤</span> Patch de universos</button>
+        <button data-tab="profiles"><span>◇</span> Biblioteca de perfiles</button>
+        <button data-tab="import"><span>↥</span> Importar configuración</button>
+        <button data-tab="settings"><span>⚙</span> Configuración</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span> Motor local<small>Art-Net / UDP · v0.1 experimental</small></div>
+    </aside>
+    <main>
+      <header class="topbar"><span>Workspace <span class="divider">/</span> <strong>Art-Net</strong></span><span class="local-label">LOCAL FIRST <span>↗</span></span></header>
+      <section class="page-heading"><div><p class="eyebrow">TU RED. CADA CANAL BAJO CONTROL.</p><h1 id="page-title">Equipos</h1><p id="page-description">Un espacio para conectar, mapear y controlar.</p></div><div class="heading-actions"><span id="output-badge" class="badge">Salida detenida</span><button class="primary" id="output-toggle">Activar salida</button></div></section>
+      <div id="message" role="status" aria-live="polite" hidden></div>
+      <section class="stats" aria-label="Resumen"><div><span>NODOS CONFIGURADOS</span><strong id="stat-nodes">0</strong><small>Destinos unicast</small></div><div><span>EQUIPOS</span><strong id="stat-fixtures">0</strong><small>Perfiles asignados</small></div><div><span>UNIVERSOS</span><strong id="stat-universes">0</strong><small>512 canales por universo</small></div><div><span>PAQUETES ENVIADOS</span><strong id="stat-frames">0</strong><small>Estado de salida asumido</small></div></section>
+      <section id="content" aria-label="Contenido"></section>
+      <footer><span class="footer-logo">h·</span> Diseñado para todo lo que conectas. <span>Art-Net™ Designed by and Copyright Artistic Licence</span></footer>
+    </main>
+  </div>
+  <dialog id="editor"><form id="editor-form"><div class="dialog-head"><h2 id="editor-title"></h2><button type="button" id="close-editor" aria-label="Cerrar">×</button></div><div id="editor-body"></div><p id="editor-error" role="alert"></p><div class="dialog-actions"><button class="primary" type="submit">Guardar cambios</button></div></form></dialog>
+</body>
+</html>

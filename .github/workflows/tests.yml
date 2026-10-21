@@ -1,0 +1,25 @@
+name: Tests
+on:
+  push:
+  pull_request:
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e '.[test]'
+      - run: ruff check apps custom_components tests scripts
+      - run: pytest -q
+      - run: docker build -t hartnet:test apps/hartnet
+  homeassistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install -e . pytest-homeassistant-custom-component==0.13.373
+      - run: pytest tests/test_homeassistant.py -q
