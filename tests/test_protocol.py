@@ -35,13 +35,15 @@ def test_poll_reply_old_and_bound_nodes():
     assert parse_poll_reply(b"bad", "10.0.0.3") is None
 
 
-async def test_actual_udp_loopback_fps_refresh_and_stop(party):
+async def test_actual_udp_loopback_fps_refresh_and_stop(sample_patch):
     receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     receiver.bind(("127.0.0.1", 0))
     receiver.setblocking(False)
-    party["nodes"][0].update(host="127.0.0.1", port=receiver.getsockname()[1], max_fps=10, refresh_every=0.2)
-    engine = Engine(party, bind_host="127.0.0.1", bind_port=0)
-    fixture = party["fixtures"][0]
+    sample_patch["nodes"][0].update(
+        host="127.0.0.1", port=receiver.getsockname()[1], max_fps=10, refresh_every=0.2
+    )
+    engine = Engine(sample_patch, bind_host="127.0.0.1", bind_port=0)
+    fixture = sample_patch["fixtures"][0]
     engine.command(fixture["id"], {"on": True, "brightness": 0})
     try:
         await engine.start()

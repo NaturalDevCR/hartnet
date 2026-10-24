@@ -140,7 +140,7 @@ def validate_project(project):
         )
         unique(project[field], field)
     for node in project["nodes"]:
-        keys(node, "id name host port max_fps refresh_every full_universe", "node")
+        keys(node, "id name host port max_fps refresh_every full_universe output_mode", "node")
         name(node.get("name"), "node.name")
         try:
             ip = IPv4Address(node["host"])
@@ -155,6 +155,7 @@ def validate_project(project):
         refresh = node.get("refresh_every", 1)
         require(type(refresh) in (int, float) and 0 <= refresh <= 120, "refresh_every: 0–120 seconds")
         require(type(node.get("full_universe", True)) is bool, "full_universe: boolean required")
+        require(node.get("output_mode", "manual") in ("manual", "subscribed"), "Invalid output mode")
     profiles = {p["id"]: validate_profile(p) for p in project["profiles"]}
     nodes = {n["id"] for n in project["nodes"]}
     occupied = {}

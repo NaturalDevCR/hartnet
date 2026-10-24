@@ -8,19 +8,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def legacy_yaml():
-    return (ROOT / "apps/hartnet/hartnet/static/party-legacy.yaml").read_text()
+    return (ROOT / "apps/hartnet/hartnet/static/example-legacy.yaml").read_text()
 
 
 @pytest.fixture
-def party(legacy_yaml):
+def sample_patch(legacy_yaml):
     return import_legacy(legacy_yaml, scalars_as_numbers=True)["project"]
 
 
 @pytest.fixture
-def generic(party):
-    party["fixtures"] = [party["fixtures"][0]]
-    profile_id = party["fixtures"][0]["profile_id"]
-    party["profiles"] = [
+def generic(sample_patch):
+    sample_patch["fixtures"] = [sample_patch["fixtures"][0]]
+    profile_id = sample_patch["fixtures"][0]["profile_id"]
+    sample_patch["profiles"] = [
         {
             "id": profile_id,
             "name": "Generic device",
@@ -39,4 +39,4 @@ def generic(party):
             ],
         }
     ]
-    return party
+    return sample_patch

@@ -3,11 +3,18 @@
 import asyncio
 import contextlib
 import logging
+import random
+import socket
 import time
 from copy import deepcopy
 
 from .model import CURVES, integer, require, validate_project
-from .protocol import PORT, art_dmx, art_poll, parse_poll_reply
+from .protocol import PORT, art_dmx, art_poll, controller_reply, parse_poll, parse_poll_reply
+
+POLL_INTERVAL = 2.75
+# Allow one polling interval plus the specification's three-second response window.
+SUBSCRIPTION_TIMEOUT = POLL_INTERVAL + 3
+MAX_DISCOVERED = 4096
 
 LIGHT_KINDS = {"dimmer", "red", "green", "blue", "white", "cold_white", "warm_white"}
 COLOR_KINDS = ["red", "green", "blue", "white", "cold_white", "warm_white"]
@@ -18,10 +25,7 @@ class Receiver(asyncio.DatagramProtocol):
         self.engine = engine
 
     def datagram_received(self, data, addr):
-        reply = parse_poll_reply(data, addr[0])
-        if reply:
-            reply["last_seen"] = time.time()
-            self.engine.discovered[f"{reply['host']}:{reply['bind_index']}"] = reply
+        self.engine.receive(data, addr)
 
     def error_received(self, exc):
         self.engine.last_error = str(exc)
@@ -34,6 +38,9 @@ class Engine:
         self.transport = self.task = None
         self.output_requested = False
         self.discovered = {}
+        self._seen = {}
+        self._reply_handles = {}
+        self._reply_counter = 0
         self.last_error = None
         self.socket_error = None
         self.frames_sent = 0
@@ -60,6 +67,105 @@ class Engine:
         self.fades = {}
         self._last_frames = {}
         self._last_sent = {}
+        self._last_poll = {}
+        self._controller_errors = {}
+        self.discovered.clear()
+        self._seen.clear()
+
+    @property
+    def subscription_mode(self):
+        return any(n.get("output_mode") == "subscribed" for n in self.project["nodes"])
+
+    def expire_discovered(self, now=None):
+        now = time.monotonic() if now is None else now
+        for key, seen in list(self._seen.items()):
+            if now - seen >= SUBSCRIPTION_TIMEOUT:
+                self._seen.pop(key, None)
+                self.discovered.pop(key, None)
+
+    def receive(self, data, addr):
+        reply = parse_poll_reply(data, addr[0])
+        if reply:
+            self.expire_discovered()
+            key = f"{reply['host']}:{reply['bind_index']}"
+            if key not in self.discovered and len(self.discovered) >= MAX_DISCOVERED:
+                return
+            previous = self.discovered.get(key, {}).get("subscriptions", [])
+            if previous != reply["subscriptions"]:
+                for node in self.project["nodes"]:
+                    if node["host"] == reply["host"] and node.get("output_mode") == "subscribed":
+                        for universe in set(previous + reply["subscriptions"]):
+                            self._last_frames.pop((node["id"], universe), None)
+                            self._last_sent.pop((node["id"], universe), None)
+            reply.update(last_seen=time.time(), source=addr[0])
+            self.discovered[key] = reply
+            self._seen[key] = time.monotonic()
+            return
+        poll = parse_poll(data)
+        if not poll or poll["targeted"] or not self.enabled or not self.subscription_mode:
+            return
+        # Controllers have no input/output subscriptions to match a targeted poll.
+        # Coalesce requests and bound delayed replies, including on a busy network.
+        if addr[0] in self._reply_handles or len(self._reply_handles) >= 32:
+            return
+        self._reply_handles[addr[0]] = asyncio.get_running_loop().call_later(
+            random.uniform(0, 1), self._reply_to_poll, addr[0]
+        )
+
+    def _local_address(self, peer):
+        if self.bind_host != "0.0.0.0":
+            return self.bind_host
+        # UDP connect selects the outgoing interface without sending a packet.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as route:
+            route.connect((peer, PORT))
+            return route.getsockname()[0]
+
+    def _reply_to_poll(self, peer):
+        self._reply_handles.pop(peer, None)
+        if not self.enabled or not self.transport:
+            return
+        try:
+            self._reply_counter += 1
+            self.transport.sendto(
+                controller_reply(self._local_address(peer), self._reply_counter), (peer, PORT)
+            )
+            self._controller_errors.pop(peer, None)
+        except OSError as err:
+            self._controller_errors[peer] = str(err)
+
+    def _poll_subscribers(self, now):
+        self.expire_discovered(now)
+        endpoints = {}
+        nodes = {n["id"]: n for n in self.project["nodes"]}
+        for fixture in self.project["fixtures"]:
+            node = nodes[fixture["node_id"]]
+            if node.get("output_mode") == "subscribed":
+                endpoint = node["host"], node.get("port", PORT)
+                endpoints.setdefault(endpoint, set()).add(fixture["universe"])
+        for endpoint, universes in endpoints.items():
+            if now - self._last_poll.get(endpoint, float("-inf")) < POLL_INTERVAL:
+                continue
+            self._last_poll[endpoint] = now
+            try:
+                self.transport.sendto(art_poll(bottom=min(universes), top=max(universes)), endpoint)
+                # A controller also announces itself to its own address when polling.
+                local = self._local_address(endpoint[0])
+                self._reply_counter += 1
+                local_port = self.bind_port or self.transport.get_extra_info("sockname")[1]
+                self.transport.sendto(controller_reply(local, self._reply_counter), (local, local_port))
+                self._controller_errors.pop(endpoint[0], None)
+            except OSError as err:
+                self._controller_errors[endpoint[0]] = str(err)
+
+    def subscribed(self, node, universe):
+        now = time.monotonic()
+        return any(
+            reply["host"] == node["host"]
+            and reply["source"] == node["host"]
+            and universe in reply["subscriptions"]
+            and now - self._seen[key] < SUBSCRIPTION_TIMEOUT
+            for key, reply in self.discovered.items()
+        )
 
     def restore_runtime(self, runtime):
         require(
@@ -253,6 +359,8 @@ class Engine:
         self.last_error = None
         self._last_sent.clear()
         self._last_frames.clear()
+        self._last_poll.clear()
+        self._controller_errors.clear()
         self.task = asyncio.create_task(self._run())
         self.task.add_done_callback(self._output_done)
 
@@ -263,6 +371,9 @@ class Engine:
 
     async def stop(self):
         self.output_requested = False
+        for handle in self._reply_handles.values():
+            handle.cancel()
+        self._reply_handles.clear()
         if self.task:
             self.task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -279,8 +390,9 @@ class Engine:
     async def discover(self, target):
         # Discovery is explicit and does not change the output patch or enable DMX.
         await self.open_socket()
-        self.transport.sendto(art_poll(), (target, PORT))
-        await asyncio.sleep(1.2)
+        self.transport.sendto(art_poll(bottom=0, top=32767), (target, PORT))
+        await asyncio.sleep(3)
+        self.expire_discovered()
         return list(self.discovered.values())
 
     async def _run(self):
@@ -295,10 +407,16 @@ class Engine:
                     raise OSError(str(error))
                 await self.open_socket()
                 now = time.monotonic()
+                self._poll_subscribers(now)
                 for key, frame in self.frames().items():
                     if now < retries.get(key, (0, 0.5))[0]:
                         continue
                     node = nodes[key[0]]
+                    if node.get("output_mode") == "subscribed" and not self.subscribed(node, key[1]):
+                        # Resubscription must send a fresh first frame even with refresh=0.
+                        self._last_frames.pop(key, None)
+                        self._last_sent.pop(key, None)
+                        continue
                     elapsed = now - self._last_sent.get(key, float("-inf"))
                     refresh = node.get("refresh_every", 1)
                     if elapsed < 1 / node.get("max_fps", 25):
@@ -320,7 +438,9 @@ class Engine:
                     sequences[key] = sequence
                     self._last_sent[key], self._last_frames[key] = now, frame
                     self.frames_sent += 1
-                self.last_error = next(iter(failures.values()), None)
+                self.last_error = next(iter(failures.values()), None) or next(
+                    iter(self._controller_errors.values()), None
+                )
                 retry_delay = 0.5
                 await asyncio.sleep(1 / 100)
             except OSError as err:
@@ -330,6 +450,9 @@ class Engine:
                     self.transport = None
                 self._last_sent.clear()
                 self._last_frames.clear()
+                self._last_poll.clear()
+                self.discovered.clear()
+                self._seen.clear()
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 10)
 
@@ -341,9 +464,17 @@ class Engine:
             return "error"
         if self.last_error:
             return "retrying"
+        if any(
+            n.get("output_mode") == "subscribed" and not self.subscribed(n, f["universe"])
+            for n in self.project["nodes"]
+            for f in self.project["fixtures"]
+            if f["node_id"] == n["id"]
+        ):
+            return "waiting"
         return "active" if self.transport else "starting"
 
     def snapshot(self):
+        self.expire_discovered()
         return {
             "project": deepcopy(self.project),
             "states": deepcopy(self.states),
@@ -353,5 +484,11 @@ class Engine:
             "frames_sent": self.frames_sent,
             "last_error": self.last_error,
             "discovered": list(self.discovered.values()),
+            "subscriptions": [
+                {"node_id": n["id"], "universe": u, "active": self.subscribed(n, u)}
+                for n in self.project["nodes"]
+                if n.get("output_mode") == "subscribed"
+                for u in sorted({f["universe"] for f in self.project["fixtures"] if f["node_id"] == n["id"]})
+            ],
             "assumed_state": True,
         }

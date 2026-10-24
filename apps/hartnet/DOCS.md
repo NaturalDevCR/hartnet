@@ -25,9 +25,14 @@ Corrupt or unsupported stored state prevents startup; it does not silently enabl
 Stopping output stops packets; the gateway may hold its last state. Turn lights off
 first if that is the intended result. ArtDmx does not confirm physical state.
 
-Output is manual unicast to configured destinations. Existing universe 0 mappings are preserved.
-UDP port 6454 must be available. Discovery sends ArtPoll only when requested and does not alter
-the patch. RDM and automatic fixture-personality detection are not implemented.
+Output defaults to manual unicast. Each node also offers subscribed unicast: while output is enabled,
+HartNet polls the configured endpoint every 2.75 seconds, sends only advertised universes and expires
+subscriptions after 5.75 seconds without a reply. Missing subscriptions show a waiting status. It also
+answers untargeted polls as a controller. Stop output to stop polling/announcements and DMX.
+
+Existing universe 0 mappings are preserved. UDP port 6454 must be available. Explicit discovery works
+with output stopped, waits up to three seconds and never alters the patch. RDM and automatic
+fixture-personality detection are not implemented. This remains a subset of Art-Net 4.
 
 Profile exports contain relative offsets without installation addresses. Use the advanced editor's
 project download for a private configuration backup. A Supervisor app backup also includes runtime state. There is no automatic community-library publishing.

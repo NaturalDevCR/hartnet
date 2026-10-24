@@ -32,9 +32,9 @@ def local_component(hass, enable_custom_integrations):
 
 
 async def test_config_flow_connects_to_actual_app(
-    hass, enable_custom_integrations, socket_enabled, aiohttp_client, tmp_path, party
+    hass, enable_custom_integrations, socket_enabled, aiohttp_client, tmp_path, sample_patch
 ):
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
     result = await hass.config_entries.flow.async_init("hartnet", context={"source": SOURCE_USER})
     assert result["type"] == "form"
@@ -49,22 +49,22 @@ async def test_config_flow_connects_to_actual_app(
         },
     )
     assert result["type"] == "create_entry", result
-    assert result["result"].unique_id == party["id"]
+    assert result["result"].unique_id == sample_patch["id"]
     await hass.async_block_till_done()
     await hass.config_entries.async_unload(result["result"].entry_id)
 
 
 async def test_native_entities_and_service_commands(
-    hass, enable_custom_integrations, socket_enabled, aiohttp_client, tmp_path, party
+    hass, enable_custom_integrations, socket_enabled, aiohttp_client, tmp_path, sample_patch
 ):
-    party["nodes"][0].update(host="127.0.0.1", port=19999)
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+    sample_patch["nodes"][0].update(host="127.0.0.1", port=19999)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
     await app[ENGINE].start()
     entry = MockConfigEntry(
         domain="hartnet",
         title="HartNet",
-        unique_id=party["id"],
+        unique_id=sample_patch["id"],
         data={
             "host": "127.0.0.1",
             "port": client.port,

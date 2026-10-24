@@ -10,38 +10,38 @@ light:
         send_partial_universe: false
         devices:
           - channel: 1
-            name: Party Spot 1
+            name: Example Spot 1
             type: rgbw
             channel_size: 8bit
             channel_setup: drgbw
           - channel: 10
-            name: Party Derby 1
+            name: Example Derby 1
             type: rgbw
             channel_size: 8bit
             channel_setup: [d, 0, r, g, b, w]
           - channel: 23
-            name: Party Derby 1 Macro
+            name: Example Derby 1 Macro
             type: dimmer
             channel_size: 8bit
           - channel: 24
-            name: Party Derby 1 Speed
+            name: Example Derby 1 Speed
             type: dimmer
             channel_size: 8bit
           - channel: 30
-            name: Party Spot 2
+            name: Example Spot 2
             type: rgbw
             channel_size: 8bit
             channel_setup: drgbw
           - channel: 40
-            name: Party Derby 2
+            name: Example Derby 2
             type: rgbw
             channel_size: 8bit
             channel_setup: [d, 0, r, g, b, w]
           - channel: 53
-            name: Party Derby 2 Macro
+            name: Example Derby 2 Macro
             type: dimmer
             channel_size: 8bit
           - channel: 54
-            name: Party Derby 2 Speed
+            name: Example Derby 2 Speed
             type: dimmer
             channel_size: 8bit

@@ -52,8 +52,22 @@ ArtDmx is UDP without physical acknowledgement. The UI reports active/stopped ou
 assumed state. Sending bytes does not establish that a node is online.
 
 One UDP socket uses local port 6454, with bounded transmission frequency. Explicit discovery
-shares the socket and identifies replies by IP and BindIndex, recording last observation.
-Periodic expiry and Art-Net 4 subscription maintenance are not implemented.
+shares the socket and identifies replies by IP and BindIndex, recording last observation. Cached
+replies expire using monotonic time after 5.75 seconds. The UI observation time uses wall-clock time.
+
+Each node defaults to manual output. Subscribed output polls the configured endpoint using targeted
+ArtPoll every 2.75 seconds while the sender runs. It accepts DMX input/output subscriptions across
+bindings, excluding disabled inputs and ports using sACN or another protocol. Both advertised and
+source IP must match the configured destination before a subscription can enable output. Discovery
+cannot change routing. Lost subscriptions invalidate the cached frame; renewed subscriptions send
+immediately even with refresh disabled. Subscriptions are never persisted.
+
+A subscribed sender answers untargeted ArtPoll after a random delay of up to one second, using a
+unicast ArtPollReply with StController and no physical DMX ports. A targeted poll cannot match this
+controller, which has no DMX input/output subscriptions. Poll cycles also send an announcement to
+the controller's own local address. Delayed replies are bounded/coalesced and cancelled on stop.
+Manual mode sends no automatic management traffic. This does not implement network-wide dynamic
+routing, all Art-Net management packets, or full Art-Net 4 conformance.
 
 Project edits require stopped output. A single versioned envelope stores the validated project,
 all accepted fixture targets and output intent. Temporary-file write, file fsync, atomic replacement

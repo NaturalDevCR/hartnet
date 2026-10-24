@@ -257,5 +257,10 @@
   "Invalid storage format": "Formato de almacenamiento inválido",
   "Existing project differs from supplied project": "El proyecto existente difiere del proyecto proporcionado",
   "Expected a JSON object": "Se esperaba un objeto JSON",
-  "Connection restored.": "Conexión restablecida."
+  "Connection restored.": "Conexión restablecida.",
+  "Subscribed unicast": "Unicast con suscripciones",
+  "Output mode": "Modo de salida",
+  "Waiting for subscriptions": "Esperando suscripciones",
+  "Invalid output mode": "Modo de salida inválido",
+  "Subscribed mode polls this destination every 2.75 seconds and sends only advertised universes. Subscriptions expire after 5.75 seconds without a reply. Manual mode sends without discovery.": "El modo con suscripciones consulta este destino cada 2,75 segundos y envía solo los universos anunciados. Las suscripciones caducan tras 5,75 segundos sin respuesta. El modo manual envía sin descubrimiento."
 }

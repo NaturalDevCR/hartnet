@@ -7,9 +7,9 @@ from hartnet.legacy import import_legacy
 from hartnet.model import ValidationError, export_profiles, validate_project
 
 
-def test_import_user_patch_exact_addresses(party):
-    assert len(party["nodes"]) == 1
-    node = party["nodes"][0]
+def test_import_sample_patch_exact_addresses(sample_patch):
+    assert len(sample_patch["nodes"]) == 1
+    node = sample_patch["nodes"][0]
     assert (node["host"], node["port"], node["max_fps"], node["refresh_every"], node["full_universe"]) == (
         "192.0.2.30",
         6454,
@@ -17,17 +17,17 @@ def test_import_user_patch_exact_addresses(party):
         1,
         True,
     )
-    assert [f["start_channel"] for f in party["fixtures"]] == [1, 10, 23, 24, 30, 40, 53, 54]
-    assert {f["universe"] for f in party["fixtures"]} == {0}
-    profiles = {p["id"]: p for p in party["profiles"]}
-    kinds = [profiles[f["profile_id"]]["controls"][0]["kind"] for f in party["fixtures"]]
+    assert [f["start_channel"] for f in sample_patch["fixtures"]] == [1, 10, 23, 24, 30, 40, 53, 54]
+    assert {f["universe"] for f in sample_patch["fixtures"]} == {0}
+    profiles = {p["id"]: p for p in sample_patch["profiles"]}
+    kinds = [profiles[f["profile_id"]]["controls"][0]["kind"] for f in sample_patch["fixtures"]]
     assert kinds == ["dimmer", "dimmer", "number", "number", "dimmer", "dimmer", "number", "number"]
 
 
-def test_render_golden_user_frame(party):
-    engine = Engine(party)
+def test_render_golden_sample_frame(sample_patch):
+    engine = Engine(sample_patch)
     assert not engine.enabled and engine.transport is None
-    spot, derby, macro, speed = party["fixtures"][:4]
+    spot, derby, macro, speed = sample_patch["fixtures"][:4]
     engine.command(spot["id"], {"on": True, "brightness": 128, "color": [255, 0, 0, 0]})
     engine.command(derby["id"], {"on": True, "brightness": 255, "color": [0, 255, 0, 128]})
     for fixture, value in [(macro, 200), (speed, 83)]:
@@ -89,8 +89,8 @@ def test_reject_invalid_patch(generic, mutation):
         validate_project(generic)
 
 
-def test_exports_exclude_installation(party):
-    bundle = export_profiles(party)
+def test_exports_exclude_installation(sample_patch):
+    bundle = export_profiles(sample_patch)
     serialized = json.dumps(bundle)
     assert "192.0.2.30" not in serialized
     assert all(field not in serialized for field in ('"node_id"', '"start_channel"', '"universe"'))

@@ -66,10 +66,10 @@ async def test_restart_restores_all_controls_and_manual_stop(aiohttp_client, tmp
         receiver.close()
 
 
-async def test_durable_target_and_concurrent_fixture_updates(aiohttp_client, tmp_path, party):
+async def test_durable_target_and_concurrent_fixture_updates(aiohttp_client, tmp_path, sample_patch):
     path = tmp_path / "project.json"
-    client = await aiohttp_client(create_app(path, TOKEN, project=party, bind_port=0))
-    spot, _, _, speed = party["fixtures"][:4]
+    client = await aiohttp_client(create_app(path, TOKEN, project=sample_patch, bind_port=0))
+    spot, _, _, speed = sample_patch["fixtures"][:4]
     responses = await asyncio.gather(
         client.post(
             f"/api/fixtures/{spot['id']}/command",
@@ -91,12 +91,12 @@ async def test_durable_target_and_concurrent_fixture_updates(aiohttp_client, tmp
 
 
 async def test_disk_failure_does_not_apply_or_acknowledge_command(
-    aiohttp_client, tmp_path, party, monkeypatch
+    aiohttp_client, tmp_path, sample_patch, monkeypatch
 ):
     import hartnet.storage as storage
 
     path = tmp_path / "project.json"
-    app = create_app(path, TOKEN, project=party, bind_port=0)
+    app = create_app(path, TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
     before, saved = copy.deepcopy(app[ENGINE].states), path.read_bytes()
 
@@ -104,7 +104,7 @@ async def test_disk_failure_does_not_apply_or_acknowledge_command(
         raise OSError("simulated disk failure")
 
     monkeypatch.setattr(storage.os, "replace", fail_replace)
-    fixture = party["fixtures"][0]["id"]
+    fixture = sample_patch["fixtures"][0]["id"]
     response = await client.post(
         f"/api/fixtures/{fixture}/command", headers=HEADERS, json={"on": True, "brightness": 63}
     )
@@ -116,16 +116,16 @@ async def test_disk_failure_does_not_apply_or_acknowledge_command(
 
 
 async def test_patch_edit_retains_unchanged_presets_and_resets_changed_mapping(
-    aiohttp_client, tmp_path, party
+    aiohttp_client, tmp_path, sample_patch
 ):
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
-    spot, speed = party["fixtures"][0], party["fixtures"][3]
+    spot, speed = sample_patch["fixtures"][0], sample_patch["fixtures"][3]
     await client.post(f"/api/fixtures/{spot['id']}/command", headers=HEADERS, json={"brightness": 81})
     await client.post(
         f"/api/fixtures/{speed['id']}/command", headers=HEADERS, json={"values": {"number_1": 255}}
     )
-    changed = copy.deepcopy(party)
+    changed = copy.deepcopy(sample_patch)
     changed["fixtures"][0]["name"] = "Renamed spot"
     profile = next(p for p in changed["profiles"] if p["id"] == spot["profile_id"])
     profile["name"] = "Renamed profile"
@@ -139,12 +139,12 @@ async def test_patch_edit_retains_unchanged_presets_and_resets_changed_mapping(
     assert app[ENGINE].transport is None
 
 
-def test_legacy_upgrade_preserves_identity_and_requires_first_activation(tmp_path, party):
+def test_legacy_upgrade_preserves_identity_and_requires_first_activation(tmp_path, sample_patch):
     path = tmp_path / "project.json"
-    path.write_text(json.dumps(party))
+    path.write_text(json.dumps(sample_patch))
     app = create_app(path, TOKEN)
-    assert app[ENGINE].project == party and not app[ENGINE].output_requested
-    assert json.loads(path.with_suffix(".previous.json").read_text()) == party
+    assert app[ENGINE].project == sample_patch and not app[ENGINE].output_requested
+    assert json.loads(path.with_suffix(".previous.json").read_text()) == sample_patch
     assert json.loads(path.read_text())["storage_version"] == 1
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.with_suffix(".previous.json").stat().st_mode & 0o777 == 0o600
@@ -171,10 +171,10 @@ def test_invalid_store_fails_closed(tmp_path, generic, corruption):
         create_app(path, TOKEN, bind_port=0)
 
 
-async def test_socket_bind_failure_retries_and_stop_cancels_backoff(party, monkeypatch):
+async def test_socket_bind_failure_retries_and_stop_cancels_backoff(sample_patch, monkeypatch):
     receiver = receiver_socket()
-    loopback(party, receiver)
-    engine = Engine(party, bind_host="127.0.0.1", bind_port=0)
+    loopback(sample_patch, receiver)
+    engine = Engine(sample_patch, bind_host="127.0.0.1", bind_port=0)
     original = engine.open_socket
     attempts = 0
 
@@ -208,8 +208,8 @@ async def test_socket_bind_failure_retries_and_stop_cancels_backoff(party, monke
         receiver.close()
 
 
-async def test_node_failure_does_not_stop_healthy_universes(party):
-    project = copy.deepcopy(party)
+async def test_node_failure_does_not_stop_healthy_universes(sample_patch):
+    project = copy.deepcopy(sample_patch)
     node = copy.deepcopy(project["nodes"][0])
     node.update(id="other-node", host="127.0.0.2")
     project["nodes"][0].update(host="127.0.0.1", refresh_every=0.05)
@@ -241,9 +241,9 @@ async def test_node_failure_does_not_stop_healthy_universes(party):
 
 
 async def test_watchdog_health_does_not_expose_state_and_detects_dead_sender(
-    aiohttp_client, tmp_path, party, monkeypatch
+    aiohttp_client, tmp_path, sample_patch, monkeypatch
 ):
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
     health = await client.get("/health")
     assert health.status == 200 and await health.json() == {"status": "ok"}
@@ -260,11 +260,11 @@ async def test_watchdog_health_does_not_expose_state_and_detects_dead_sender(
     assert (await client.get("/health")).status == 200
 
 
-async def test_acknowledged_values_survive_sigkill_and_first_packet_is_restored(tmp_path, party):
+async def test_acknowledged_values_survive_sigkill_and_first_packet_is_restored(tmp_path, sample_patch):
     receiver = receiver_socket()
-    loopback(party, receiver)
+    loopback(sample_patch, receiver)
     path = tmp_path / "project.json"
-    path.write_text(json.dumps(party))
+    path.write_text(json.dumps(sample_patch))
     port_socket = socket.socket()
     port_socket.bind(("127.0.0.1", 0))
     port = port_socket.getsockname()[1]
@@ -300,7 +300,7 @@ async def test_acknowledged_values_survive_sigkill_and_first_packet_is_restored(
                         await asyncio.sleep(0.05)
 
             process = await launch()
-            spot, speed = party["fixtures"][0], party["fixtures"][3]
+            spot, speed = sample_patch["fixtures"][0], sample_patch["fixtures"][3]
             for fixture, command in [
                 (spot, {"on": True, "brightness": 139, "color": [20, 255, 76, 8]}),
                 (speed, {"values": {"number_1": 217}}),
@@ -329,17 +329,17 @@ async def test_acknowledged_values_survive_sigkill_and_first_packet_is_restored(
         receiver.close()
 
 
-async def test_unchanged_commands_do_not_rewrite_storage(aiohttp_client, tmp_path, party, monkeypatch):
+async def test_unchanged_commands_do_not_rewrite_storage(aiohttp_client, tmp_path, sample_patch, monkeypatch):
     import hartnet.storage as storage
 
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
 
     def unexpected_write(*args, **kwargs):
         raise AssertionError("No-op command attempted a disk write")
 
     monkeypatch.setattr(storage, "atomic_save", unexpected_write)
-    fixture = party["fixtures"][0]["id"]
+    fixture = sample_patch["fixtures"][0]["id"]
     assert (
         await client.post(
             f"/api/fixtures/{fixture}/command", headers=HEADERS, json={"on": False, "brightness": 255}

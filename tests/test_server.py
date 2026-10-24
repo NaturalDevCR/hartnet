@@ -33,14 +33,14 @@ async def test_api_auth_preview_commit_persistence(aiohttp_client, tmp_path, leg
     assert path.with_suffix(".previous.json").exists()
 
 
-async def test_invalid_patch_does_not_replace_config(aiohttp_client, tmp_path, party):
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+async def test_invalid_patch_does_not_replace_config(aiohttp_client, tmp_path, sample_patch):
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
-    broken = copy.deepcopy(party)
+    broken = copy.deepcopy(sample_patch)
     broken["fixtures"][0]["start_channel"] = 512
     response = await client.put("/api/project", headers=HEADERS, json=broken)
     assert response.status == 400
-    assert app[ENGINE].project == party
+    assert app[ENGINE].project == sample_patch
     assert app[ENGINE].transport is None
 
 
@@ -57,13 +57,13 @@ async def test_invalid_body_and_csrf(aiohttp_client, tmp_path):
     ).status == 403
 
 
-async def test_api_read_only_while_outputting(aiohttp_client, tmp_path, party):
-    party["nodes"][0].update(host="127.0.0.1", port=19999)
-    app = create_app(tmp_path / "project.json", TOKEN, project=party, bind_port=0)
+async def test_api_read_only_while_outputting(aiohttp_client, tmp_path, sample_patch):
+    sample_patch["nodes"][0].update(host="127.0.0.1", port=19999)
+    app = create_app(tmp_path / "project.json", TOKEN, project=sample_patch, bind_port=0)
     client = await aiohttp_client(app)
     await client.post("/api/output", headers=HEADERS, json={"enabled": True})
     assert app[ENGINE].enabled
-    response = await client.put("/api/project", headers=HEADERS, json=party)
+    response = await client.put("/api/project", headers=HEADERS, json=sample_patch)
     assert response.status == 400
     await client.post("/api/output", headers=HEADERS, json={"enabled": False})
     assert not app[ENGINE].enabled

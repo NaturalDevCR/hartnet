@@ -2,7 +2,7 @@
 
 **Art-Net profiles, a visual workspace, and native Home Assistant entities.**
 
-Status: **experimental alpha 0.3.0**. The engine, app and HA integration are implemented.
+Status: **experimental alpha 0.4.0**. The engine, app and HA integration are implemented.
 Physical gateway and fixture validation is ongoing. This is a subset of Art-Net functionality.
 
 ![HartNet workspace with a sample patch](docs/images/hartnet.png)
@@ -21,7 +21,8 @@ Function semantics come from each fixture's manual.
 - 8/16/24/32-bit functions with adjacent or separate bytes and configurable byte order.
 - Portable JSON profiles without installation IPs, universes or start addresses.
 - Unicast output, per-node FPS limits, refresh and transitions for continuous values.
-- Explicit ArtPoll / ArtPollReply discovery, including BindIndex.
+- ArtPoll / ArtPollReply discovery, including BindIndex, input/output subscriptions and expiry.
+- Optional subscribed unicast with periodic targeted polls and controller announcements.
 - Address, overlap, range and option validation; authenticated API and atomic project backups.
 - Durable light/number/select/switch values and output intent, restored before the first DMX frame.
 - Bounded network retries and a Supervisor health endpoint for process recovery.
@@ -77,6 +78,26 @@ Version 0.2 saved no runtime values. The first upgrade to 0.3 therefore starts s
 intended presets and enable output once. Subsequent restarts recover automatically. Invalid or
 unsupported stored state fails closed instead of transmitting invented defaults. Keep backups.
 
+## Art-Net subscriptions (0.4)
+
+Each node's **Output mode** defaults to **Manual unicast**, preserving existing behavior. Choose
+**Subscribed unicast** to send a universe only while that configured IP advertises it in ArtPollReply.
+HartNet sends targeted ArtPoll every 2.75 seconds while output is enabled, requests change
+notifications, and expires replies after 5.75 seconds (one interval plus a three-second response
+window). Missing subscriptions show **Waiting for subscriptions**; they are not a physical-state check.
+
+Input and output subscriptions are combined across BindIndex records. Disabled inputs, sACN ports
+and non-DMX ports are excluded. A withdrawn or expired subscription stops that universe; its
+reappearance sends a fresh frame even when periodic refresh is disabled. Other destinations continue.
+Discovery never adds or redirects output destinations. Subscriptions are learned again after restart;
+the first transmitted frame still uses the saved runtime values.
+
+While subscribed output is enabled, HartNet answers untargeted ArtPoll with delayed unicast
+ArtPollReply as a controller with no physical DMX ports, and announces itself locally when polling.
+Announcements currently use `OemUnknown` (`0x00ff`); an assigned product OEM code and broader
+hardware/conformance validation remain release work. Stopping output stops polling and announcements
+as well as DMX. Explicit discovery remains available with output stopped and waits up to three seconds.
+
 ## Profiles and devices
 
 Profiles describe functions with relative slots ordered most-significant byte first. For example,
@@ -118,17 +139,16 @@ It never enables DMX. Network tests are restricted to loopback.
 
 ## Limits and roadmap
 
-The current sender uses manual unicast. It is not a complete Art-Net 4 controller with subscriptions
-and announcements. RDM, ArtDataRequest, DMX input/merge, ArtSync, ArtTrigger, timecode, sACN,
-KiNet, OFL/GDTF imports and a community library are not implemented. No channel scanning is used
-to guess fixture functions.
+The sender supports manual unicast and optional subscription-aware unicast to explicitly configured
+nodes. It remains a subset of Art-Net 4, without full network-wide controller management. RDM,
+ArtDataRequest, DMX input/merge, ArtSync, ArtTrigger, timecode, sACN, KiNet, OFL/GDTF imports and
+a community library are not implemented. Fixture functions require documented profiles.
 
 Unassigned slots are sent as zero. Stopping output stops packets; a gateway may hold the last
 state. Turning a light off does not reset its independent numbers, selectors or relays. Define
 resting values explicitly. ArtDmx does not acknowledge physical fixture state.
 
-See the [architecture](docs/architecture.md), [validation record](docs/validation.md),
-and [reversible Party Button migration](docs/party-migration.md).
+See the [architecture](docs/architecture.md) and [validation record](docs/validation.md).
 
 ## Attribution
 

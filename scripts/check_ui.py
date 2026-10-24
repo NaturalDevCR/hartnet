@@ -33,7 +33,7 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.querySelector('#inspector input[type=number]').value === '87'")
     # External HA/API changes appear in the open inspector on the next poll.
     snapshot = page.request.get("http://127.0.0.1:8099/api/state").json()
-    speed = next(f for f in snapshot["project"]["fixtures"] if f["name"] == "Party Derby 1 Speed")
+    speed = next(f for f in snapshot["project"]["fixtures"] if f["name"] == "Example Derby 1 Speed")
     response = page.request.post(
         f"http://127.0.0.1:8099/api/fixtures/{speed['id']}/command", data={"values": {"number_1": 93}}
     )
@@ -77,6 +77,19 @@ with sync_playwright() as playwright:
     page.get_by_role("button", name="Save changes").click()
     expect(page.locator("#editor-error")).to_contain_text("IPv4 address required")
     page.get_by_role("button", name="Close", exact=True).click()
+    # Subscription mode can be saved offline, translated and recovered on reload.
+    page.get_by_role("button", name="Edit", exact=True).first.click()
+    page.locator('#editor select[name="output_mode"]').select_option("subscribed")
+    page.get_by_role("button", name="Save changes").click()
+    page.locator("#editor").wait_for(state="hidden")
+    snapshot = page.request.get("http://127.0.0.1:8099/api/state").json()
+    assert snapshot["project"]["nodes"][0]["output_mode"] == "subscribed"
+    assert not snapshot["output_requested"] and snapshot["frames_sent"] == 0
+    page.reload()
+    page.get_by_text("Subscribed unicast", exact=True).wait_for()
+    page.locator("#language").select_option("es")
+    page.get_by_text("Unicast con suscripciones", exact=True).wait_for()
+    page.locator("#language").select_option("en")
     # Re-import the unchanged public mapping; retained values remain offline.
     page.get_by_role("button", name="Import configuration").click()
     page.get_by_role("button", name="Load example configuration").click()
